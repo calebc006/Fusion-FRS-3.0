@@ -85,3 +85,5 @@ I would like to extend my gratitude to the following people and resources:
 - [**Tabler Icons**](https://tabler.io/icons): Multiple icons from Tabler were used in the UI of both simpliFRy and gotendance.
 - [**CJBuzz**](https://github.com/CJBuzz): The first few developers that made this project happen.
 - [**plainpotato**](https://github.com/plainpotato): Taught and provided support for a big part of the project.
+- [**bryannyp**] (https://github.com/bryannyp): Build the UI for the gotendance app
+-
