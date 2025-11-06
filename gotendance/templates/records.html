@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Records</title>
+    <link rel="icon" type ="image/x-icon" href="/static/favicon.ico">
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/main.css'>
+    <!-- <link rel='stylesheet' type='text/css' media='screen' href='/static/css/entrylist.css'> -->
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/pages/records.css'>
+</head>
+<body>
+    <div class="search-container">
+        <div class="search-icon-container">
+            <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-search">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                <path d="M21 21l-6 -6" />
+            </svg>
+        </div>
+        
+        <input type="text" placeholder="Search..." class="search-bar" id="search"></input>
+    </div>
+
+    <hr class="section-break" />
+    <div class="dashboard">
+      <div class="attendance" id="attendance"></div>
+      <div class="percentage" id="percentage"></div>
+
+      <div class="filter-buttons">
+        <button onclick="records.filterRecords('all')">All</button>
+        <button onclick="records.filterRecords('present')">Present</button>
+        <button onclick="records.filterRecords('absent')">Absent</button>
+      </div>
+      
+  </div>
+ 
+    <hr class="section-break" />
+    <div class="table-container">
+        <table class="recordsTable" id="records-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th onclick="sortTable(1)">Attendance</th>
+            </tr>
+        </thead>
+       <tbody id="records-list-data">
+    </tbody> 
+    </table>
+    </div>
+    
+    
+    <script src='/static/js/records.js'></script>
+    <div class="button-container"><a type="button" class="export-button" download="attendance" href="./fetchAttendance">Export</a></div>
+    <!-- <div class="button-container">
+      <script>
+        var HrefData = {url: href="http://localhost:1500/fetchAttendance"}
+      </script>
+            <a type="button" class="export-button" download="output1" href="./fetchAttendance">Export</a>
+            <button type="button" class="export-button" onclick="jsonToCSV(HrefData), download="outputcsv">Export CSV</button>
+    </div>
+
+    <script>
+function jsonToCSV(jsonData){
+            let csv = '';
+            csv = Object.entries(jsonData[0]).forEach((e)=> console.log(e[0], ',', e[1].attendance));
+
+          return csv
+          
+        } -->
+        
+     
+        <!-- function sortTable(n) {
+  var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+  table = document.getElementById("records-table");
+  switching = true;
+  // Set the sorting direction to ascending:
+  dir = "asc";
+  /* Make a loop that will continue until
+  no switching has been done: */
+  while (switching) {
+    // Start by saying: no switching is done:
+    switching = false;
+    rows = table.rows;
+    /* Loop through all table rows (except the
+    first, which contains table headers): */
+    for (i = 1; i < (rows.length - 1); i++) {
+      // Start by saying there should be no switching:
+      shouldSwitch = false;
+      /* Get the two elements you want to compare,
+      one from current row and one from the next: */
+      x = rows[i].getElementsByTagName("TD")[n];
+      y = rows[i + 1].getElementsByTagName("TD")[n];
+      /* Check if the two rows should switch place,
+      based on the direction, asc or desc: */
+      if (dir == "asc") {
+        if (x.value > y.value) {
+          // If so, mark as a switch and break the loop:
+          console.log(x)
+          console.log(y)
+          shouldSwitch = true;
+          break;
+        }
+      } else if (dir == "desc") {
+        if (x.value < y.value) {
+          // If so, mark as a switch and break the loop:
+          console.log(x)
+          console.log(y)
+          shouldSwitch = true;
+          break;
+        }
+      }
+    }
+    if (shouldSwitch) {
+      /* If a switch has been marked, make the switch
+      and mark that a switch has been done: */
+      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+      switching = true;
+      // Each time a switch is done, increase this count by 1:
+      switchcount ++;
+    } else {
+      /* If no switching has been done AND the direction is "asc",
+      set the direction to "desc" and run the while loop again. */
+      if (switchcount == 0 && dir == "asc") {
+        dir = "desc";
+        switching = true;
+      }
+    }
+  }
+} -->
+    </script>
+</body>
+</html>

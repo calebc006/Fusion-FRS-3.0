@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>Home</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link rel="icon" type ="image/x-icon" href="/static/favicon.ico">
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/main.css'>
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/entrylist.css'>
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/form.css'>
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/fileform.css'>
+    <link rel='stylesheet' type='text/css' media='screen' href='/static/css/pages/home.css'>
+</head>
+<body>
+    <h2 class="title">Load Personnel List</h2>
+    <form action="/initData" method="POST" class="file-form" id="fileForm" enctype="multipart/form-data">
+        <label for="fileInput" class="file-input-label">
+            <input type="file" id="fileInput" name="jsonFile" accept=".json" required>
+            <span class="file-name-label" id="fileInputLabel">Select File</span>
+        </label>
+        <button type="submit" class="upload-button">
+            <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-upload"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 9l5 -5l5 5" /><path d="M12 4l0 12" /></svg>
+        </button>
+    </form>
+    <br />
+    <hr class="section-break"/>
+
+    <h2 class="title">Add Stream</h2>
+    <form action="/startCollate" method="POST" class="form" id="streamForm">
+        <label for="frUrl">FR Results Stream Url</label>
+        <input type="url" class="text-input" id="frUrl" name="frUrl" required />
+        <div class="break">
+        </div>
+        <label for="updateInterval">Update Interval (seconds)</label>
+        <input type="number" class="text-input" id="updateInterval" name="updateInterval" value="1" min="0.1" max="100" step="0.1" required/>
+        <div class="break">
+        </div>
+        <input type="submit" id="submit-button" class="submit-button" value="Submit" />
+    </form>
+
+    <br />
+    <hr class="section-break"/>
+    <div id="streams">
+        <h2 class="title">Result Streams</h2>
+        <div id="streams-list" class="entry-list">
+            {{range .}}
+                <div class="stream-entry entry">
+                    <p class="stream-url entry-text">{{.Url}}</p>
+                    <button type="button" class="remove-button side-button" onclick="handleRemove('{{.Url}}')">
+                        <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                    </button>
+                </div>
+            {{end}}
+            
+            <form action="http://localhost:1500/records" target="_blank" class="form">
+                <input type="submit" value="Go to Results Page" class="submit-button">
+            </form>
+        </div>
+    </div>
+    <script src='/static/js/home.js'></script>
+</body>
+</html>

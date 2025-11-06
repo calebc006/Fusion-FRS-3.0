@@ -1,0 +1,54 @@
+# Use an official NVIDIA runtime as a parent image
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+
+# Set the working director in the container
+WORKDIR /app
+
+# Set time-zone
+ENV LANG="C.UTC-8" LC_ALL="C.UTF-8"
+
+RUN echo 'Etc/UTC' > /etc/timezone \
+    && ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime
+
+# Install essential system dependencies & backend dependencies
+RUN apt update -y && apt upgrade -y\
+    -y --no-install-recommends \
+    build-essential && \
+    apt install -y --no-install-recommends \
+    software-properties-common -y \ 
+    python3-dev \
+    python3-pip \
+    gcc \ 
+    cmake \
+    clang \ 
+    git \
+    libopencv-dev \
+    pciutils \ 
+    ffmpeg \
+    unzip && \
+    add-apt-repository universe && \
+    apt clean && rm -rf /var/lib/apt/list/*
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+# Copy requirement files and install them
+COPY requirements.txt requirements.txt
+RUN pip3 install -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Set up symlink for a problematic cuDNN file in pytorch
+RUN cd /usr/local/lib/python3.10/dist-packages/torch/lib && ln -s libnvrtc-672ee683.so.11.2 libnvrtc.so
+
+# Copy and unzip the buffalo model files
+COPY buffalo_l.zip /root/.insightface/models/buffalo_l.zip
+RUN unzip "/root/.insightface/models/buffalo_l.zip" -d "/root/.insightface/models/buffalo_l" && \
+    rm "/root/.insightface/models/buffalo_l.zip"
+
+# Expose port 1333
+EXPOSE 1333
+
+# Set the entrypoint to the python command
+ENTRYPOINT ["python3", "app.py"]

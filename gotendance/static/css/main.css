@@ -1,0 +1,32 @@
+:root {
+  --color-background: #242424;
+  --color-foreground: #dddddd;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-background: #fff;
+    --color-foreground: #000;
+  }
+}
+
+body {
+  height: 100 vh;
+  width: 100 vw;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.title {
+  margin-top: 0.75em;
+  text-align: center;
+}
+
+.hidden-object {
+  display: none
+}
+
+.section-break {
+  max-width: 600px;
+}

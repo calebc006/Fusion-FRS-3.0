@@ -1,0 +1,45 @@
+.entry-list {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    flex-direction: column;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    height: calc(100vh - 11em);
+    overflow-y: hidden;
+    padding-right: 0.2em;
+    /* scrollbar-width: thin; */
+    /* scrollbar-color: var(--color-foreground) var(--color-background); */
+}
+
+.entry-list:hover {
+    overflow-y: auto;
+}
+
+.entry-list::-webkit-scrollbar {
+    width: 0.4em;
+}
+
+.entry-list::-webkit-scrollbar-thumb {
+    background: var(--color-foreground);
+    border-radius: 1em;
+    border: none
+}
+
+.entry-list::-webkit-scrollbar-thumb:hover {
+    background: #aaaaaa;
+}
+
+.entry {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-content: center;
+    gap: 1em;
+    margin-top: 0.5em;
+}
+
+.entry-text {
+    margin: 0.5em;
+}

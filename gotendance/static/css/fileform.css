@@ -1,0 +1,60 @@
+.file-form {
+    display: flex;
+    justify-content: center;
+}
+
+input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+}
+
+.file-input-label {
+    display: flex;
+    align-items: center;
+    padding-right: 1em;
+    padding-left: 1em;
+    background-color: rgb(50, 50, 50);
+    border-radius: 1em 0em 0em 1em;
+}
+
+.file-name-label {
+    width: 150px;
+    overflow-x: hidden;
+}
+
+.upload-button {
+    padding: 0.5em;
+    padding-right: 0.6em;
+    background-color: rgb(47, 79, 79);
+    border-radius: 0em 1em 1em 0em;
+    border-width: 0;
+}
+
+.upload-button:hover {
+    background-color: rgb(35, 65, 65);
+    cursor:pointer;
+}
+
+.icon-tabler-upload {
+    color: var(--color-foreground);
+}
+
+@media (prefers-color-scheme: light) {
+    .file-input-label {
+        background-color: rgb(240, 240, 240);
+    }
+
+    .upload-button {
+        background-color: rgb(168, 201, 201);
+    }
+
+    .upload-button:hover {
+        background-color: rgb(111, 201, 201);
+    }
+}

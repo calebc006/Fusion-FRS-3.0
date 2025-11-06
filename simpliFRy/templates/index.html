@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FR Live</title>
+    <link rel="icon" href="../static/favicon.png" />
+    <link rel="stylesheet" href="../static/css/main.css" />
+    <link rel="stylesheet" href="../static/css/index.css" />
+    <link rel="stylesheet" href="../static/css/form.css" />
+  </head>
+  <body class="bg-image" style="background-image: url(../static/background.png)">
+    <div id="table-menu" style="display: none">
+      <div class="menu-header" id="table-menu-header">
+        <span>Settings</span>
+        <button id="close-menu">×</button>
+      </div>
+      <div class="seating-options">
+        <button id="add-table">Add Table</button>
+        <button id="remove-table">Remove Table</button>
+        <button id="reset-tables">Reset All Tables</button>
+        <div class="lock-toggle">
+          <input type="checkbox" id="lock-tables" />
+          <label for="lock-tables">Lock Tables (Disable Dragging)</label>
+        </div>
+        <div class="menu-option">
+          <label for="toggle-video">
+            <input type="checkbox" id="toggle-video" />Show Video
+          </label>
+        </div>
+      </div>
+    </div>
+    <!-- <div class="flex-container-logo">
+      <img src="../static/armylogo.png" />
+      <img src="../static/11logo.png" />
+      <img class="fusion-logo" src="../static/fusionlogo.png" />
+    </div>
+    <div class="flex-container">
+      <h1 class="title" style="color: whitesmoke;">Facial Recognition</h1>
+    </div> -->
+    <div id="seatings-container" class="seatings"></div>
+    <div id="main-container">
+      <div id="video-container" class="hidden" style="margin-top: 27vh;">
+        <object id="video-feed" type="image/jpeg">
+          <img src="../static/default.jpg" alt="default video image" />
+        </object>
+      </div>
+      <div class="detection-list-container" style="overflow-y: hidden; max-height: 90vh;">
+        <div class="detections" id="detections-list" style="margin-top: 20vh; max-width: 17vw; font-family: Helvetica;"></div>
+      </div>
+      <div class="taskbar-placeholder">
+        <div class="taskbar">
+          <button id="end_stream_button">End Stream</button>
+        </div>
+      </div>
+    </div>
+
+    <form id="init" class="form">
+      <label for="stream_src_select">Video Stream Source</label>
+        <select id="stream_src_select" class="init-input" name="stream_src" required>
+          <option value="rtsp://admin:CV@hikvision@192.168.1.65">192.168.1.65</option>
+          <option value="rtsp://admin:CV@hikvision@192.168.1.66">192.168.1.66</option>
+          <option value="rtsp://admin:CV@hikvision@192.168.1.67">192.168.1.67</option>
+          <option value="rtsp://admin:CV@hikvision@192.168.1.68">192.168.1.68</option>
+          <option value="rtsp://admin:CV@hikvision@192.168.1.69">192.168.1.69</option>
+          <option value="rtsp://admin:CV@hikvision@192.168.1.70">192.168.1.70</option>
+          <option value="custom">Custom</option>
+        </select>
+      <input type="url" id="stream_src_custom" class="init-input" style="display:none;" placeholder="Enter custom RTSP URL" />
+
+      <div class="break"></div>
+      <label for="data_file">Path to JSON file</label>
+      <input type="text" id="data_file" class="init-input" name="data_file" />
+      <div class="break"></div>
+
+      <input
+        type="submit"
+        id="submit-button"
+        class="submit-button"
+        value="Submit"
+      />
+    </form>
+    <input
+      type="color"
+      id="box-color-picker"
+      style="position: absolute; display: none; z-index: 9999"
+    />
+    <script src="../static/js/detections.js"></script>
+    <script src="../static/js/stream.js"></script>
+    <script src="../static/js/index.js"></script>
+  </body>
+</html>

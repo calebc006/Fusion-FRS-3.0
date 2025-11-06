@@ -1,0 +1,26 @@
+.remove-button {
+    color: var(--color-foreground);
+    height: 2.5em;
+    margin-top: auto;
+    margin-bottom: auto;
+    padding: 0.4em 0.4em;
+    border-radius: 1em;
+    border-width: 0;
+    background-color: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.remove-button:hover {
+    background-color: rgba(71, 71, 71, 0.336);
+    cursor:pointer;
+}
+
+.icon-tabler-trash {
+    color: rgb(150, 50, 50);
+}
+
+/* .icon-tablet-trash:hover {
+    color: rgb(134, 24, 5);
+} */

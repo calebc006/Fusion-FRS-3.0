@@ -1,0 +1,13 @@
+{
+    "img_folder_path": "path/to/image/folder",
+    "details": [
+      {
+        "name": "John Doe",
+        "images": ["john_doe1.jpg", "john_doe2.png"]
+      },
+      {
+        "name": "Jane Smith",
+        "images": ["jane_smith.png"]
+      }
+    ]
+  }

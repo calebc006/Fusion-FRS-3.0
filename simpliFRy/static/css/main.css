@@ -1,0 +1,44 @@
+:root {
+  /* --color-background: #87CEFA;
+  --color-foreground: #000000; */
+  --color-background: #242424;
+  --color-foreground: #dddddd;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-background: #fff;
+    --color-foreground: #000;
+  }
+}
+
+hr {
+  width: 2px;
+  background-color: #fff;
+  color: #fff;
+}
+
+body {
+  height: 100 vh;
+  width: 100 vw;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.bg-image {
+  background-repeat: no-repeat;
+  background-size: 100%;
+}
+
+.title {
+  /* margin-top: 0.75em; */
+  text-align: center;
+  margin-right: 20px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 40px;
+}
+
+.hidden-object {
+  display: none
+}
