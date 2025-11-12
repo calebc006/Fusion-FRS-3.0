@@ -1,23 +1,26 @@
 #main-container {
   display: flex;
-  justify-content: space-evenly;
-  align-items: center;
-  height: 75%;
-  max-width: 100%;
+  justify-content: space-between;
+  align-items: flex-start;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 38vh;
+  left: 0;
 }
 
 .country-flag-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 200px;
-  max-width: 200px;
-  padding: 1em;
+  width: 33.33%;
+  padding: 2em;
+  box-sizing: border-box;
 }
 
 #country-flag-img {
   max-width: 100%;
-  max-height: 200px;
+  max-height: 400px;
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
@@ -157,15 +160,19 @@
 
 .detection-list-container {
   display: flex;
-  min-width: 20%;
+  width: 66.67%;
   font-family: 'Times New Roman', Times, serif;
   font-size: 24px;
+  box-sizing: border-box;
+  padding: 2em;
+  overflow-y: auto;
 }
 
 .detections {
   padding: 1em;
-  font-size: 24px;
+  font-size: 36px;
   font-family: 'Times New Roman', Times, serif;
+  width: 100%;
 }
 
 .detectionEntry {
@@ -229,9 +236,15 @@
     flex-direction: column;
   }
 
+  .country-flag-container {
+    width: 100%;
+    height: 33.33%;
+  }
+
   .detection-list-container {
     justify-content: center;
     width: 100%;
+    height: 66.67%;
   }
 
   .detections {
