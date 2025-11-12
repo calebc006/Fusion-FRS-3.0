@@ -1,8 +1,9 @@
 import argparse
 import json
+import os
 import signal
 
-from flask import Flask, Response, render_template, request, redirect, url_for
+from flask import Flask, Response, render_template, request, redirect, url_for, send_from_directory
 from flask_cors import CORS
 
 from fr import FRVidPlayer
@@ -158,7 +159,12 @@ def face():
 
 @app.route('/faces/<path:filename>')
 def serve_face(filename):
-    return send_from_directory(data/faces, filename)
+    return send_from_directory('data/faces', filename)
+
+@app.route('/data/<path:filename>')
+def serve_data(filename):
+    """Serve files from the data directory"""
+    return send_from_directory('data', filename)
 
 @app.route("/settings")
 def settings():

@@ -83,6 +83,59 @@ const setBBoxPos = (bboxEl, bbox, width, height) => {
 let currData = [];
 let streamCheck = false;
 const detectionList = document.getElementById("detections-list");
+let fusionData = null;
+let latestDetection = null;
+const countryFlagImg = document.getElementById("country-flag-img");
+
+// Load fusion.json data
+const loadFusionData = async () => {
+  try {
+    const response = await fetch('/data/fusion.json');
+    if (response.ok) {
+      fusionData = await response.json();
+    } else {
+      console.warn('Could not load fusion.json');
+    }
+  } catch (error) {
+    console.error('Error loading fusion.json:', error);
+  }
+};
+
+// Get country flag path for a given name
+const getCountryFlag = (name) => {
+  if (!fusionData || !fusionData.details) return null;
+  
+  const person = fusionData.details.find(detail => {
+    // Match by name (case-insensitive, partial match)
+    return detail.name.toLowerCase().includes(name.toLowerCase()) || 
+           name.toLowerCase().includes(detail.name.toLowerCase());
+  });
+  
+  if (person && person.country_flag) {
+    // Construct the full path relative to data directory
+    const imgFolderPath = fusionData.img_folder_path || '';
+    return `/data/${imgFolderPath}/${person.country_flag}`;
+  }
+  
+  return null;
+};
+
+// Update country flag display
+const updateCountryFlag = (detectionName) => {
+  if (!detectionName || detectionName === "Unknown") {
+    countryFlagImg.style.display = 'none';
+    return;
+  }
+  
+  const flagPath = getCountryFlag(detectionName);
+  if (flagPath) {
+    countryFlagImg.src = flagPath;
+    countryFlagImg.style.display = 'block';
+    latestDetection = detectionName;
+  } else {
+    countryFlagImg.style.display = 'none';
+  }
+};
 
 const updateBoxAnimations = (detectedLabels) => {
   const boxes = document.querySelectorAll("#seatings-container .box");
@@ -111,6 +164,9 @@ const endDetections = () => {
   streamCheck = false;
   currData = [];
   clearBBoxes();
+  // Clear the country flag
+  countryFlagImg.style.display = 'none';
+  latestDetection = null;
 };
 
 const fetchDetections = () => {
@@ -174,33 +230,47 @@ const updateDetections = (data) => {
   currData = [];
   const videoContainer = clearBBoxes();
   const uniqueLabels = new Set();
+  let mostRecentDetection = null;
 
-  data
-    .sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0))
-    .map((detection) => {
-      const unknown = detection.label === "Unknown";
+  // Process detections in order of detection (no sorting)
+  data.forEach((detection) => {
+    const unknown = detection.label === "Unknown";
 
-      if (!unknown && !uniqueLabels.has(detection.label)) {
-        createDetectionEl(detection.label);
-        uniqueLabels.add(detection.label);
-      }
+    if (!unknown && !uniqueLabels.has(detection.label)) {
+      createDetectionEl(detection.label);
+      uniqueLabels.add(detection.label);
+    }
 
-      if (!detection.bbox) return;
+    // Track the last non-unknown detection as the most recent
+    if (!unknown) {
+      mostRecentDetection = detection.label;
+    }
 
-      const bboxEl = document.createElement("div");
-      bboxEl.classList.add("bbox");
-      if (!unknown) {
-        bboxEl.classList.add("bbox-identified");
-      }
+    if (!detection.bbox) return;
 
-      bboxEl.innerHTML = `<p class="bbox-label${unknown ? "" : " bbox-label-identified"}">${detection.label} <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
+    const bboxEl = document.createElement("div");
+    bboxEl.classList.add("bbox");
+    if (!unknown) {
+      bboxEl.classList.add("bbox-identified");
+    }
 
-      currData.push(detection.bbox);
-      setBBoxPos(bboxEl, detection.bbox, videoContainer.offsetWidth, videoContainer.offsetHeight);
-      videoContainer.appendChild(bboxEl);
-    });
+    bboxEl.innerHTML = `<p class="bbox-label${unknown ? "" : " bbox-label-identified"}">${detection.label} <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
+
+    currData.push(detection.bbox);
+    setBBoxPos(bboxEl, detection.bbox, videoContainer.offsetWidth, videoContainer.offsetHeight);
+    videoContainer.appendChild(bboxEl);
+  });
 
   updateBoxAnimations(Array.from(uniqueLabels));
+  
+  // Update country flag for the latest detection
+  if (mostRecentDetection) {
+    updateCountryFlag(mostRecentDetection);
+  } else {
+    // No identified detections in current list, hide flag
+    countryFlagImg.style.display = 'none';
+    latestDetection = null;
+  }
 };
 
 window.addEventListener("resize", () => {
@@ -511,6 +581,7 @@ function makeMenuDraggable(menuId, handleId) {
 
 window.addEventListener("DOMContentLoaded", () => {
   makeMenuDraggable("table-menu", "table-menu-header");
+  loadFusionData();
 });
 
 const colorPicker = document.getElementById("box-color-picker");
