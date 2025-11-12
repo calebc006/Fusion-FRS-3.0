@@ -431,18 +431,56 @@ document.getElementById("reset-tables")?.addEventListener("click", () => {
   pushHistory(); 
 });
 
+const videoModal = document.getElementById("video-modal");
 const videoContainer = document.getElementById("video-container");
 const toggleVideoCheckbox = document.getElementById("toggle-video");
+const closeVideoModal = document.getElementById("close-video-modal");
+const modalOverlay = document.querySelector(".modal-overlay");
 
 const isVideoVisible = localStorage.getItem("videoVisible") === "true";
 toggleVideoCheckbox.checked = isVideoVisible;
-videoContainer.classList.toggle("hidden", !isVideoVisible);
+if (isVideoVisible) {
+  videoModal.classList.remove("hidden");
+} else {
+  videoModal.classList.add("hidden");
+}
+
+const showVideoModal = () => {
+  videoModal.classList.remove("hidden");
+  localStorage.setItem("videoVisible", "true");
+};
+
+const hideVideoModal = () => {
+  videoModal.classList.add("hidden");
+  localStorage.setItem("videoVisible", "false");
+};
 
 toggleVideoCheckbox.addEventListener("change", () => {
-  const showVideo = toggleVideoCheckbox.checked;
-  videoContainer.classList.toggle("hidden", !showVideo);
-  localStorage.setItem("videoVisible", showVideo);
+  if (toggleVideoCheckbox.checked) {
+    showVideoModal();
+  } else {
+    hideVideoModal();
+  }
 });
+
+closeVideoModal.addEventListener("click", () => {
+  hideVideoModal();
+  toggleVideoCheckbox.checked = false;
+});
+
+modalOverlay.addEventListener("click", () => {
+  hideVideoModal();
+  toggleVideoCheckbox.checked = false;
+});
+
+// Button to open video modal
+const openVideoModalButton = document.getElementById("open-video-modal-button");
+if (openVideoModalButton) {
+  openVideoModalButton.addEventListener("click", () => {
+    showVideoModal();
+    toggleVideoCheckbox.checked = true;
+  });
+}
 
 function makeMenuDraggable(menuId, handleId) {
   const menu = document.getElementById(menuId);
@@ -519,10 +557,11 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  // Existing shortcut for menu toggle remains
-  if (e.shiftKey && e.altKey && e.code === "Digit0") {
-    const menu = document.getElementById("table-menu");
-    menu.style.display = menu.style.display === "none" ? "block" : "none";
+  // Close video modal on Escape key
+  if (e.key === "Escape" && !videoModal.classList.contains("hidden")) {
+    hideVideoModal();
+    toggleVideoCheckbox.checked = false;
+    return;
   }
 
   // Undo on Ctrl+Z or Cmd+Z
