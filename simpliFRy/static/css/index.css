@@ -1,12 +1,13 @@
 #main-container {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   height: 75vh;
   width: 100vw;
   position: fixed;
-  top: 25vh;
   left: 0;
+  bottom: 0;
+  margin: 0;
 }
 
 .country-flag-container {
@@ -17,7 +18,8 @@
   padding: 2em;
   box-sizing: border-box;
   position: relative;
-  transform: translateY(20%);
+  
+  transform: translateY(-7vh);
 }
 
 #country-flag-img {
@@ -163,17 +165,16 @@
 .detection-list-container {
   display: flex;
   width: 66.67%;
-  height: 100%;
+  height: 75vh;
   font-family: 'Times New Roman', Times, serif;
   font-size: 24px;
   box-sizing: border-box;
   padding: 2em;
-  margin-top: 5%;
   overflow-y: auto;
 }
 
 .detections {
-  padding: 1em;
+  margin-top: 2.3em;
   font-size: 36px;
   font-family: 'Times New Roman', Times, serif;
   width: 100%;
@@ -195,7 +196,7 @@
 }
 
 .detectionName {
-  font-size: 55px; 
+  font-size: 45px; 
   font-weight: bold;
   margin: 0;
   padding: 0;
@@ -220,11 +221,7 @@
 }
 
 .fusion-logo {
-  height: 85px;
   padding-top: 10px;
-}
-
-.logo {
   height: 80px;
   width: auto;
   margin-right: 20px;
