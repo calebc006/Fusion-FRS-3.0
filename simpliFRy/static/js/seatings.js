@@ -1,3 +1,33 @@
+
+const toggleSeatingsButton = document.getElementById("toggle-seating-button")
+
+toggleSeatingsButton.addEventListener("click", (e) => {
+  const menu = document.getElementById("table-menu");
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+
+  // Undo on Ctrl+Z or Cmd+Z
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    e.preventDefault();
+
+    if (historyIndex > 0) {
+      historyIndex--;
+      const prevState = historyStack[historyIndex];
+      restoreState(prevState);
+    }
+  }
+
+  // Redo on Ctrl+Y or Cmd+Y
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+    e.preventDefault();
+
+    if (historyIndex < historyStack.length - 1) {
+      historyIndex++;
+      const nextState = historyStack[historyIndex];
+      restoreState(nextState);
+    }
+  }
+});
+
 let historyStack = [];
 let historyIndex = -1; // points to current state in history
 
@@ -26,6 +56,8 @@ const pushHistory = () => {
     historyStack.shift();
     historyIndex--;
   }
+
+  console.log("Current Tables: ", historyStack[historyStack.length - 1])
 };
 
 const restoreState = (state) => {
@@ -49,7 +81,7 @@ const restoreState = (state) => {
     newBox.style.height = `${height}px`;
 
     container.appendChild(newBox);
-    makeDraggable(newBox);
+    makeDraggableBox(newBox);
   });
 
   saveTablesToStorage();
@@ -74,7 +106,7 @@ const loadTablesFromStorage = () => {
     if (container) {
       container.appendChild(newBox);
     }
-    makeDraggable(newBox);
+    makeDraggableBox(newBox);
   });
 };
 
@@ -122,51 +154,21 @@ const updateBoxAnimations = (detectedLabels) => {
   });
 };
 
-const makeDraggable = (box) => {
-  box.style.position = "absolute";
-
-  // Respect current lock state
-  box.style.pointerEvents = document.getElementById("lock-tables").checked ? "none" : "auto";
-
-  // Enable renaming when clicking on the table name
-  box.addEventListener("click", (e) => {
-    if (document.getElementById("lock-tables").checked) return; // Prevent renaming if locked
-
-    const labelEl = box.querySelector(".box-label");
-    const label = labelEl?.innerText.trim() || "";
-    const inputField = document.createElement("input");
-    inputField.value = label;
-    inputField.classList.add("rename-input");
-
-    // Replace the box label with input field for renaming
-    labelEl.innerHTML = "";
-    labelEl.appendChild(inputField);
-    inputField.focus();
-
-    inputField.addEventListener("blur", () => {  // On blur (click outside)
-      const newName = inputField.value.trim();
-      if (newName !== label && newName !== "") {
-        labelEl.innerText = newName;
-        saveTablesToStorage();  // Save the updated name to localStorage
-        pushHistory(); 
-      } else {
-        labelEl.innerText = label;
-      }
-    });
-
-    inputField.addEventListener("keydown", (e) => {  // Allow renaming via Enter key
-      if (e.key === "Enter") {
-        const newName = inputField.value.trim();
-        if (newName !== label && newName !== "") {
-          labelEl.innerText = newName;
-          saveTablesToStorage();  // Save the updated name to localStorage
-          pushHistory(); 
-        } else {
-          labelEl.innerText = label;
-        }
-      }
-    });
+const createDeleteBtn = (box) => {
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-btn";
+  deleteBtn.innerHTML = "×";
+  deleteBtn.title = "Delete";
+  
+  deleteBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // Prevent triggering drag
+    box.remove();
+    saveTablesToStorage();
+    pushHistory(); 
   });
+  
+  box.appendChild(deleteBtn);
+}
 
 const createResizeSlider = (box) => {
   const sliderWrapper = document.createElement("div");
@@ -202,23 +204,72 @@ const createResizeSlider = (box) => {
   box.appendChild(sliderWrapper);
 };
 
-createResizeSlider(box); // Call this after the drag/rename logic
+const makeDraggableBox = (box) => {
+  box.style.position = "absolute";
+  createResizeSlider(box)
+  createDeleteBtn(box)
 
-const deleteBtn = document.createElement("button");
-deleteBtn.className = "delete-btn";
-deleteBtn.innerHTML = "×";
-deleteBtn.title = "Delete";
+  // Respect current lock state
+  box.style.pointerEvents = document.getElementById("lock-tables").checked ? "none" : "auto";
 
-deleteBtn.addEventListener("click", (e) => {
-  e.stopPropagation(); // Prevent triggering drag
-  box.remove();
-  saveTablesToStorage();
-  pushHistory(); 
-});
+  // Enable renaming, show slider and delete-btn when clicking on the table name
+  box.addEventListener("click", (e) => {
+    const resizeSlider = box.getElementsByClassName("resize-slider-wrapper")[0].querySelector("input")
+    const deleteBtn = box.getElementsByClassName("delete-btn")[0]
+    resizeSlider.style.display = "block"
+    deleteBtn.style.display = "block"
 
-box.appendChild(deleteBtn);
+    if (document.getElementById("lock-tables").checked) return; // Prevent renaming if locked
 
+    const labelEl = box.querySelector(".box-label");
+    const label = labelEl?.innerText.trim() || "";
+    const inputField = document.createElement("input");
+    inputField.value = label;
+    inputField.classList.add("rename-input");
 
+    // Replace the box label with input field for renaming
+    labelEl.innerHTML = "";
+    labelEl.appendChild(inputField);
+    inputField.focus();
+
+    // On blur (click outside)
+    inputField.addEventListener("blur", (e) => {  
+      const newName = inputField.value.trim();
+      if (newName !== label && newName !== "") {
+        labelEl.innerText = newName;
+        saveTablesToStorage();  // Save the updated name to localStorage
+        pushHistory(); 
+      } else {
+        labelEl.innerText = label;
+      }
+    });
+
+    // Allow renaming via Enter key
+    inputField.addEventListener("keydown", (e) => {  
+      if (e.key === "Enter") {
+        const newName = inputField.value.trim();
+        if (newName !== label && newName !== "") {
+          labelEl.innerText = newName;
+          saveTablesToStorage();  // Save the updated name to localStorage
+          pushHistory(); 
+        } else {
+          labelEl.innerText = label;
+        }
+      }
+    });
+  });
+
+  // Remove deletebtn and resizeSlider when clicking out
+  document.addEventListener("click", (e) => {
+    const resizeSlider = box.getElementsByClassName("resize-slider-wrapper")[0].querySelector("input")
+    const deleteBtn = box.getElementsByClassName("delete-btn")[0]
+    if (!resizeSlider.contains(e.target) && !box.contains(e.target)) {
+      resizeSlider.style.display = "none"
+      deleteBtn.style.display = "none"
+    }
+  })
+
+  // dragging logic
   box.addEventListener("mousedown", (e) => {
     if (document.getElementById("lock-tables").checked) return; // Prevent drag if locked
 
@@ -276,7 +327,7 @@ document.getElementById("add-table").addEventListener("click", () => {
   if (container) {
     container.appendChild(newBox);
   }
-  makeDraggable(newBox);
+  makeDraggableBox(newBox);
   saveTablesToStorage();
   pushHistory(); 
 });
@@ -340,7 +391,6 @@ function makeMenuDraggable(menuId, handleId) {
 
 window.addEventListener("DOMContentLoaded", () => {
   makeMenuDraggable("table-menu", "table-menu-header");
-  loadNamelistJSON();
 });
 
 document.getElementById("seatings-container").addEventListener("contextmenu", (e) => {

@@ -4,41 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FR Live</title>
-    <link rel="icon" href="../static/favicon.png" />
+    <link rel="icon" href="../static/fusionlogo.png" />
     <link rel="stylesheet" href="../static/css/main.css" />
     <link rel="stylesheet" href="../static/css/index.css" />
     <link rel="stylesheet" href="../static/css/form.css" />
   </head>
   <body class="bg-image" style="background-image: url(../static/background.png)">
-    <div id="table-menu" style="display: none">
-      <div class="menu-header" id="table-menu-header">
-        <span>Settings</span>
-        <button id="close-menu">×</button>
-      </div>
-      <div class="seating-options">
-        <button id="add-table">Add Table</button>
-        <button id="remove-table">Remove Table</button>
-        <button id="reset-tables">Reset All Tables</button>
-        <div class="lock-toggle">
-          <input type="checkbox" id="lock-tables" />
-          <label for="lock-tables">Lock Tables (Disable Dragging)</label>
-        </div>
-        <div class="menu-option">
-          <label for="toggle-video">
-            <input type="checkbox" id="toggle-video" />Open Video Modal
-          </label>
-        </div>
-      </div>
-    </div>
-    <!-- <div class="flex-container-logo">
+    <!-- Logos -->
+    <div class="flex-container-logo">
       <img src="../static/armylogo.png" />
       <img src="../static/11logo.png" />
       <img class="fusion-logo" src="../static/fusionlogo.png" />
     </div>
-    <div class="flex-container">
-      <h1 class="title" style="color: whitesmoke;">Facial Recognition</h1>
-    </div> -->
-    <div id="seatings-container" class="seatings"></div>
+
+    <!-- Contains flags and detections -->
     <div id="main-container">
       <div id="country-flag-container" class="country-flag-container">
         <img id="country-flag-img" src="" alt="Country Flag" style="display: none;" />
@@ -46,11 +25,13 @@
       <div class="detection-list-container">
         <div class="detections" id="detections-list"></div>
       </div>
-      <div class="taskbar-placeholder">
-        <div class="taskbar">
-          <button id="open-video-modal-button">Open Video</button>
-          <button id="end_stream_button">End Stream</button>
-        </div>
+    </div>
+
+    <!-- Bottom Taskbar -->
+    <div class="taskbar-placeholder">
+      <div class="taskbar">
+        <button id="open-video-modal-button">Open Video</button>
+        <button id="end_stream_button">End Stream</button>
       </div>
     </div>
 
@@ -70,6 +51,7 @@
       </div>
     </div>
 
+    <!-- Initialisation form -->
     <form id="init" class="form">
       <label for="stream_src_select">Video Stream Source</label>
         <select id="stream_src_select" class="init-input" name="stream_src" required>
@@ -95,16 +77,11 @@
         value="Submit"
       />
     </form>
-    <input
-      type="color"
-      id="box-color-picker"
-      style="position: absolute; display: none; z-index: 9999"
-    />
-    <script src="../static/js/seatings.js"></script>
+    
+    <script src="../static/js/taskbar.js"></script>
     <script src="../static/js/detections.js"></script>
     <script src="../static/js/stream.js"></script>
     <script src="../static/js/index.js"></script>
     <script src="../static/js/videoModal.js"></script>
-    <script src="../static/js/settings.js"></script>
   </body>
 </html>

@@ -123,6 +123,8 @@ input:hover {
 #table-menu .menu-header {
     cursor: move;
     display: flex;
+    flex-direction: row;
+    align-items: top;
     justify-content: space-between;
     align-items: center;
     font-weight: bold;
@@ -149,6 +151,10 @@ input:hover {
     font-size: 14px;
 }
 
+#close-menu {
+    max-width: 50px;
+}
+
 .menu-option {
     margin: 10px 0;
     font-size: 14px;
@@ -170,13 +176,13 @@ input:hover {
     width: 100%;
     height: 100%;
     outline: none;
-  }
+}
   
-  .rename-input:focus {
-    background-color: rgba(0, 0, 0, 0.5);  /* Optional: Add a background color when focused */
-  }
+.rename-input:focus {
+background-color: rgba(0, 0, 0, 0.5);  /* Optional: Add a background color when focused */
+}
 
-  .resize-slider-wrapper {
+.resize-slider-wrapper {
   position: absolute;
   bottom: -28px;
   left: 0;
@@ -190,6 +196,7 @@ input:hover {
 
 .resize-slider {
   width: 70%;
+  display: none;
 }
 
 .slider-label {
@@ -215,10 +222,6 @@ input:hover {
   cursor: pointer;
   display: none;
   z-index: 10;
+  display: none;
 }
 
-.box:hover .delete-btn {
-  display: block;
-}
-
-  

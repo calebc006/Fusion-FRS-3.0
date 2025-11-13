@@ -1,6 +1,4 @@
 document.getElementById("main-container").style.display = 'none'
-document.getElementById("seatings-container").style.display = 'none'
-document.getElementById("table-menu").style.display = 'none'
 
 const delay = (time) => {
     return new Promise(resolve => setTimeout(resolve, time))
@@ -17,10 +15,6 @@ const startDisplay = (formEl) => {
 
     // Start video stream
     videoFeed.setAttribute('data', '/vidFeed')
-
-    // Show seating and tables
-    document.getElementById("seatings-container").style.display = "block"
-    loadTablesFromStorage()
 
     // Start detection overlays
     fetchDetections()
@@ -97,16 +91,6 @@ document.getElementById("init").onsubmit = async (event) => {
 }
 
 
-const taskbarPlaceholder = document.querySelector(".taskbar-placeholder")
-const taskbar = document.querySelector(".taskbar")
-
-taskbarPlaceholder.addEventListener("mouseenter", () => {
-    taskbar.classList.add("show")
-})
-
-taskbarPlaceholder.addEventListener("mouseleave", () => {
-    taskbar.classList.remove("show")
-})
 
 document.getElementById("end_stream_button").addEventListener("click", async (event) => {
     // Handles form submission to end stream

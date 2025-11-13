@@ -19,6 +19,10 @@ const loadNamelistJSON = async () => {
   }
 };
 
+window.addEventListener("DOMContentLoaded", () => {
+  loadNamelistJSON();
+});
+
 // Get country flag path for a given name
 const getCountryFlag = (name) => {
   if (!namelistJSON || !namelistJSON.details) return null;
@@ -199,8 +203,6 @@ const updateDetections = (data) => {
     videoContainer.appendChild(bboxEl);
   });
 
-  updateBoxAnimations(Array.from(uniqueLabels));
-  
   // Update country flag for the latest detection
   if (mostRecentDetection) {
     updateCountryFlag(mostRecentDetection);

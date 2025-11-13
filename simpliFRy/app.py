@@ -151,15 +151,11 @@ def index():
 
     return render_template("index.html")
 
-@app.route("/face")
+@app.route("/seats")
 def face():
-    """Renders home page which includes the live feed (with bounding boxes) and a detection list"""
+    """Renders a page with the seating plan, with seats that light up upon detection."""
 
-    return render_template("face.html")
-
-@app.route('/faces/<path:filename>')
-def serve_face(filename):
-    return send_from_directory('data/faces', filename)
+    return render_template("seats.html")
 
 @app.route('/data/<path:filename>')
 def serve_data(filename):

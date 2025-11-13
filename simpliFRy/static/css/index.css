@@ -213,6 +213,10 @@
   justify-content: center;
   height: 100px;
   width: auto;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  opacity: 70%;
 }
 
 .fusion-logo {
@@ -320,6 +324,14 @@
 
 #open-video-modal-button:hover {
   background-color: rgba(50, 167, 50, 0.5);
+}
+
+#toggle-seating-button {
+  background-color: rgba(19, 84, 206, 0.8);
+}
+
+#toggle-seating-button:hover {
+  background-color: rgba(19, 84, 206, 0.5);
 }
 
 .taskbar.show {
