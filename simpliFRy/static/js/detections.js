@@ -195,9 +195,9 @@ const updateDetections = (data) => {
     const unknown = detection.label === "Unknown";
 
     // if you want to hide unknown bboxes
-    if (unknown) {
-      return;
-    }
+    // if (unknown) {
+    //   return;
+    // }
 
     if (!unknown && !uniqueLabels.has(detection.label)) {
       description = getDescription(detection.label)

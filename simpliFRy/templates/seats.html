@@ -6,8 +6,8 @@
     <title>FR Live</title>
     <link rel="icon" href="../static/fusionlogo.png" />
     <link rel="stylesheet" href="../static/css/main.css" />
-    <link rel="stylesheet" href="../static/css/index.css" />
-    <link rel="stylesheet" href="../static/css/form.css" />
+    <link rel="stylesheet" href="../static/css/taskbar.css" />
+    <link rel="stylesheet" href="../static/css/seats.css" />
   </head>
   <body class="bg-image" style="background-image: url('../static/seats_bg.png')">
     <!-- Seatings Menu -->
@@ -26,7 +26,12 @@
         </div>
       </div>
     </div>
+
+    <!-- Tables go in here -->
     <div id="seatings-container" class="seatings"></div>
+
+    <!-- Detection list goes here -->
+    <div class="table-detection-list" id="table-detection-list"></div>
 
     <!-- Logos -->
     <div class="flex-container-logo">
@@ -47,7 +52,7 @@
       id="box-color-picker"
       style="position: absolute; display: none; z-index: 9999"
     />
-    <script src="../static/js/seatings.js"></script>
+    <script src="../static/js/seats.js"></script>
     <script src="../static/js/taskbar.js"></script>
   </body>
 </html>

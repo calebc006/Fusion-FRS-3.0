@@ -130,38 +130,6 @@
   color: dimgray;
 }
 
-.bbox {
-  position: absolute;
-  background-color: transparent;
-  border: 5px solid red;
-  border-radius: 5px;
-}
-
-.bbox-identified {
-  border-color: blue;
-}
-
-.bbox-label {
-  font-size: 100%;
-  font-weight: bold;
-  color: red;
-  position: absolute;
-  width: max-content;
-  top: -3em;
-  left: 50%;
-  -webkit-transform: translateX(-50%);
-  transform: translateX(-50%);
-}
-
-.bbox-label-identified {
-  color: blue;
-}
-
-.bbox-score {
-  margin-left: 10px;
-  font-style: italic;
-}
-
 .detection-list-container {
   display: flex;
   width: 66.67%;
@@ -177,7 +145,6 @@
   margin-top: 4.3em;
   padding-right: 1.4em;
   font-size: 36px;
-  font-family: 'Times New Roman', Times, serif;
   width: 100%;
 }
 
@@ -191,171 +158,26 @@
 
 .detectionDesc {
   font-size: 40px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: Helvetica, sans-serif;
+  /* font-family: 'Courier New', Courier, monospace; */
   margin: 0;
-  margin-top: 0.5em;
+  margin-top: 0.4em;
   padding: 0;
 }
 
 .detectionName {
   font-size: 65px; 
+  font-family: Helvetica, sans-serif;
   font-weight: bold;
   margin: 0;
   padding: 0;
   line-height: 1;
 }
 
-.flex-container {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-}
-
-.flex-container-logo {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  height: 100px;
-  width: auto;
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  opacity: 70%;
-}
-
-.fusion-logo {
-  padding-top: 10px;
-  height: 80px;
-  width: auto;
-  margin-right: 20px;
-}
 
 
-@media (max-width: 768px) {
-  .modal-content {
-    max-width: 95vw;
-    max-height: 95vh;
-  }
-
-  .modal-header {
-    padding: 0.75em 1em;
-  }
-
-  .modal-header h2 {
-    font-size: 1.2em;
-  }
-
-  #video-container {
-    padding: 1em;
-  }
-
-  .detectionEntry {
-    font-size: medium;
-  }
-}
 
 
-@media screen and (orientation: portrait) {
-  #main-container {
-    flex-direction: column;
-    align-items: center;
-  }
 
-  .country-flag-container {
-    width: 100%;
-    height: 33.33%;
-  }
 
-  .detection-list-container {
-    justify-content: center;
-    width: 100%;
-    height: 66.67%;
-  }
 
-  .detections {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 2em;
-    width: 100%;
-  }
-
-  .detectionEntry {
-    text-align: center;
-  }
-}
-
-.taskbar-placeholder {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background-color: rgba(0, 0, 0, 0);
-}
-
-.taskbar {
-  height: 100%;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  visibility: hidden;
-  transition: visibility 0s 0.3s, transform 0.3s ease-in-out;
-  transform: translateY(100%);
-}
-
-.taskbar button {
-  padding: 1em 1.5em;
-  margin-bottom: 0.5em;
-  margin-right: 0.5em;
-  color: var(--color-foreground);
-  background-color: rgba(167, 50, 50, 0.8);
-  border-width: 0px;
-  border-radius: 1em;
-  cursor: pointer;
-  transition: background-color 0.2s ease, pointer-events 0.2s ease;
-}
-
-.taskbar button:hover {
-  background-color: rgba(167, 50, 50, 0.5);
-}
-
-#open-video-modal-button {
-  background-color: rgba(50, 167, 50, 0.8);
-}
-
-#open-video-modal-button:hover {
-  background-color: rgba(50, 167, 50, 0.5);
-}
-
-#toggle-seating-button {
-  background-color: rgba(19, 84, 206, 0.8);
-}
-
-#toggle-seating-button:hover {
-  background-color: rgba(19, 84, 206, 0.5);
-}
-
-.taskbar.show {
-  visibility: visible;
-  transform: translateY(0%);
-  transition: transform 0.3s ease-in-out;
-}
-
-.taskbar.show button {
-  pointer-events: auto;
-}
-
-.highlighted {
-  border: solid gold 15px;
-  box-sizing: border-box;
-  background-color: gold;
-}
-
-.highlighted .box-label {
-  color:  gold;
-  font-size: 30px;
-}
-
-.slider-label {
-  color: black;
-  display: none;
-}

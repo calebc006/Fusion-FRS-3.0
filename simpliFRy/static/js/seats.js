@@ -452,6 +452,7 @@ const loadNamelistJSON = async () => {
   }
 };
 
+// MAIN LOOP
 const fetchDetections = () => {
   console.log("FETCHING...");
   let buffer = '';
@@ -463,9 +464,6 @@ const fetchDetections = () => {
 
     const processStream = () => {
       reader.read().then(({ done, value }) => {
-        if (done) {
-          resetTables()
-        }
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
@@ -483,7 +481,7 @@ const fetchDetections = () => {
         buffer = parts[parts.length - 1];
         
         updateTables(data)
-
+        updateTableDetections(data)
         processStream()
       });
     };
@@ -531,6 +529,7 @@ const resetTables = () => {
 const updateTables = (data) => {
   const uniqueLabels = new Set();
   let mostRecentTable = null;
+  resetTables()
 
   // Process detections in order of detection (no sorting)
   data.forEach((detection) => {
@@ -558,3 +557,32 @@ const updateTables = (data) => {
     resetTables()
   }
 };
+
+// table detection list functionality
+
+const detectionList = document.getElementById("table-detection-list")
+
+const updateTableDetections = (data) => {
+  let detections = []
+
+  data.forEach(detection => {
+    const name = detection.label
+    if (name == "Unknown") {
+      return
+    }
+    const table = getTable(name)
+
+    let detectionEl = document.createElement('div')
+    detectionEl.classList.add('table-detection-element')
+    detectionEl.innerHTML = `${name} (${table})`
+
+    detections.push(detectionEl)
+  })
+
+  detections = sortTableDetections(detections)
+  detectionList.replaceChildren(...detections)
+}
+
+const sortTableDetections = (detectionList) => {
+  return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText))
+}

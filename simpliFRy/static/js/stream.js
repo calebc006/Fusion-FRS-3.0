@@ -90,22 +90,5 @@ document.getElementById("init").onsubmit = async (event) => {
     })
 }
 
-document.getElementById("end_stream_button").addEventListener("click", async (event) => {
-    // Handles form submission to end stream
-
-    event.preventDefault()
-    endDetections()
-    document.getElementById("video-feed").removeAttribute('data')
-
-    fetch('/end', {
-        method: 'POST'
-    }).then(response => response.json()).then(_data => {
-        document.getElementById("main-container").style.display = 'none'
-        document.getElementById("init").style.display = 'flex'
-    }).catch(error => {
-        console.log(error)
-    })
-})
-
 document.getElementById("main-container").style.display = 'none'
 checkAlive()
