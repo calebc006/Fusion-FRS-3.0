@@ -56,13 +56,13 @@ const updateBBoxes = (data) => {
 
     const bboxEl = document.createElement("div");
     bboxEl.classList.add("bbox");
-    if (!unknown) {
-      bboxEl.classList.add("bbox-identified");
-    }
+    bboxEl.classList.add("bbox-identified");
 
-    bboxEl.innerHTML = `<p class="bbox-label${unknown ? "" : " bbox-label-identified"}">${detection.label} <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
-    // bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
-    // bboxEl.style.display = 'none'
+    // old UI for blue and red boxes
+    // bboxEl.innerHTML = `<p class="bbox-label${unknown ? "" : " bbox-label-identified"}">${detection.label} <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
+
+    // new UI with all blue boxes
+    bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
 
     currData.push(detection.bbox);
     setBBoxPos(bboxEl, detection.bbox, videoContainer.offsetWidth, videoContainer.offsetHeight);
