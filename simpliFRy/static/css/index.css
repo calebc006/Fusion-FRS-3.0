@@ -174,14 +174,15 @@
 }
 
 .detections {
-  margin-top: 2.3em;
+  margin-top: 5em;
+  padding-right: 1.4em;
   font-size: 36px;
   font-family: 'Times New Roman', Times, serif;
   width: 100%;
 }
 
 .detectionEntry {
-  text-align: left;
+  text-align: center;
   color: #333333;
   display: flex;
   flex-direction: column;
@@ -189,17 +190,19 @@
 }
 
 .detectionDesc {
-  font-size: 30px;
+  font-size: 40px;
   font-family: 'Courier New', Courier, monospace;
   margin: 0;
+  margin-top: 0.5em;
   padding: 0;
 }
 
 .detectionName {
-  font-size: 45px; 
+  font-size: 65px; 
   font-weight: bold;
   margin: 0;
   padding: 0;
+  line-height: 1;
 }
 
 .flex-container {
@@ -339,4 +342,20 @@
 
 .taskbar.show button {
   pointer-events: auto;
+}
+
+.highlighted {
+  border: solid gold 15px;
+  box-sizing: border-box;
+  background-color: gold;
+}
+
+.highlighted .box-label {
+  color:  gold;
+  font-size: 30px;
+}
+
+.slider-label {
+  color: black;
+  display: none;
 }

@@ -1,3 +1,12 @@
+let namelistJSON = null
+
+window.addEventListener("DOMContentLoaded", () => {
+  makeMenuDraggable("table-menu", "table-menu-header");
+  loadTablesFromStorage();
+  loadNamelistJSON().then(()=> {
+    fetchDetections();
+  });
+});
 
 const toggleSeatingsButton = document.getElementById("toggle-seating-button")
 
@@ -73,6 +82,7 @@ const restoreState = (state) => {
   state.forEach(({ id, x, y, label, color, width, height }) => {
     const newBox = document.createElement("div");
     newBox.className = `box ${id}`;
+    newBox.id = id
     newBox.innerHTML = `<div class="box-label">${label}</div>`;
     newBox.style.left = `${x}px`;
     newBox.style.top = `${y}px`;
@@ -96,6 +106,7 @@ const loadTablesFromStorage = () => {
   savedTables.forEach(({ id, x, y, label, color, width, height }) => {
     const newBox = document.createElement("div");
     newBox.className = `box ${id}`;
+    newBox.id = id;
     newBox.innerHTML = `<div class="box-label">${label}</div>`;
     newBox.style.left = `${x}px`;
     newBox.style.top = `${y}px`;
@@ -127,7 +138,8 @@ const saveTablesToStorage = () => {
 };
 
 const randomColor = () => {
-  const colors = ["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0"];
+  // const colors = ["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0"];
+  const colors = ["#e6194b"];
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
@@ -173,7 +185,7 @@ const createDeleteBtn = (box) => {
 const createResizeSlider = (box) => {
   const sliderWrapper = document.createElement("div");
   sliderWrapper.className = "resize-slider-wrapper";
-  sliderWrapper.style.display = document.getElementById("lock-tables").checked ? "none" : "flex";
+  sliderWrapper.style.display = localStorage.getItem("tables") ? "none" : "flex";
 
   const label = document.createElement("span");
   label.className = "slider-label";
@@ -210,7 +222,7 @@ const makeDraggableBox = (box) => {
   createDeleteBtn(box)
 
   // Respect current lock state
-  box.style.pointerEvents = document.getElementById("lock-tables").checked ? "none" : "auto";
+  box.style.pointerEvents = localStorage.getItem("locked") === "true" ? "none" : "auto";
 
   // Enable renaming, show slider and delete-btn when clicking on the table name
   box.addEventListener("click", (e) => {
@@ -219,7 +231,7 @@ const makeDraggableBox = (box) => {
     resizeSlider.style.display = "block"
     deleteBtn.style.display = "block"
 
-    if (document.getElementById("lock-tables").checked) return; // Prevent renaming if locked
+    if (localStorage.getItem("locked") === "true") return; // Prevent renaming if locked
 
     const labelEl = box.querySelector(".box-label");
     const label = labelEl?.innerText.trim() || "";
@@ -271,7 +283,7 @@ const makeDraggableBox = (box) => {
 
   // dragging logic
   box.addEventListener("mousedown", (e) => {
-    if (document.getElementById("lock-tables").checked) return; // Prevent drag if locked
+    if (localStorage.getItem("locked") === "true") return; // Prevent drag if locked
 
     let offsetX = e.clientX - box.offsetLeft;
     let offsetY = e.clientY - box.offsetTop;
@@ -296,7 +308,8 @@ const makeDraggableBox = (box) => {
 
 document.getElementById("lock-tables").addEventListener("change", () => {
   const boxes = document.querySelectorAll("#seatings-container .box");
-  const locked = document.getElementById("lock-tables").checked;
+  localStorage.setItem("locked", localStorage.getItem("locked") === "true" ? "false" : "true")
+  const locked = localStorage.getItem("locked") === "true";
 
   boxes.forEach((box) => {  
     box.style.pointerEvents = locked ? "none" : "auto";
@@ -321,6 +334,7 @@ document.getElementById("add-table").addEventListener("click", () => {
   boxCount += 1;
   const newBox = document.createElement("div");
   newBox.className = `box box${boxCount}`;
+  newBox.id = `box${boxCount}`;
   newBox.innerHTML = `<div class="box-label">T${boxCount}</div>`;
   newBox.style.backgroundColor = randomColor();
   const container = document.getElementById("seatings-container");
@@ -389,10 +403,6 @@ function makeMenuDraggable(menuId, handleId) {
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  makeMenuDraggable("table-menu", "table-menu-header");
-});
-
 document.getElementById("seatings-container").addEventListener("contextmenu", (e) => {
   const targetBox = e.target.closest(".box");
   if (!targetBox) return;
@@ -422,3 +432,125 @@ document.addEventListener("click", (e) => {
     colorPicker.style.display = "none";
   }
 });
+
+// LIGHTING FUNCTIONALITY
+const loadNamelistJSON = async () => {
+  try {
+    const response = await fetch('/data/namelist.json');
+    if (response.ok) {
+      namelistJSON = await response.json();
+    } else {
+      console.warn('Could not load namelist.json');
+    }
+  } catch (error) {
+    console.error('Error loading namelist.json:', error);
+  }
+};
+
+const fetchDetections = () => {
+  console.log("FETCHING...");
+  let buffer = '';
+  let data = [];
+
+  fetch(`/frResults`).then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    const processStream = () => {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          resetTables()
+        }
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const parts = buffer.split('\n');
+
+        try {
+          if (parts.length > 1) {
+            data = JSON.parse(parts[parts.length - 2])?.data;
+          }
+        } catch (err) {
+          console.log(buffer);
+          console.error('Error parsing JSON:', err);
+        }
+
+        buffer = parts[parts.length - 1];
+
+        // console.log("updating...", data)
+        updateTables(data)
+
+        processStream()
+      });
+    };
+
+    processStream();
+  });
+};
+
+const getTable = (name) => {
+  if (!namelistJSON || !namelistJSON.details) return null;
+  
+  const person = namelistJSON.details.find(detail => {
+    // Match by name (case-insensitive, partial match)
+    return detail.name.toLowerCase().includes(name.toLowerCase()) || 
+           name.toLowerCase().includes(detail.name.toLowerCase());
+  });
+  
+  if (person && person.table) {
+    return person.table
+  }
+  
+  return null;
+};
+
+const updateTable = (tableName) => {
+  const tables = JSON.parse(localStorage.getItem("tables"))
+  const id = tables.find(table => {
+    return table.label === tableName
+  }).id
+
+  resetTables()
+  const tableEl = document.getElementById(id)
+  tableEl.classList.add("highlighted");
+}
+
+const resetTables = () => {
+  const tables = JSON.parse(localStorage.getItem("tables"))
+  tables.forEach(table => {
+    const tableEl = document.getElementById(table.id)
+    if ( tableEl !== null && tableEl.classList.contains("highlighted") ){
+      tableEl.classList.remove("highlighted");
+    }
+  })
+}
+
+const updateTables = (data) => {
+  const uniqueLabels = new Set();
+  let mostRecentTable = null;
+
+  // Process detections in order of detection (no sorting)
+  data.forEach((detection) => {
+    const unknown = detection.label === "Unknown";
+
+    if (!unknown && !uniqueLabels.has(detection.label)) {
+      table = getTable(detection.label); // e.g. "T4"
+      uniqueLabels.add(detection.label);
+    }
+
+    // Track the last non-unknown detection as the most recent
+    if (!unknown) {
+      mostRecentTable = table;
+    }
+
+    if (!detection.bbox) return;
+  });
+
+  // Light up table for the latest detection
+  if (mostRecentTable) {
+    updateTable(mostRecentTable)
+  } else {
+    // No identified detections in current list, hide flag
+    resetTables()
+  }
+};

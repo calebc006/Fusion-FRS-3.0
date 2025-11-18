@@ -90,8 +90,6 @@ document.getElementById("init").onsubmit = async (event) => {
     })
 }
 
-
-
 document.getElementById("end_stream_button").addEventListener("click", async (event) => {
     // Handles form submission to end stream
 
@@ -108,7 +106,6 @@ document.getElementById("end_stream_button").addEventListener("click", async (ev
         console.log(error)
     })
 })
-
 
 document.getElementById("main-container").style.display = 'none'
 checkAlive()

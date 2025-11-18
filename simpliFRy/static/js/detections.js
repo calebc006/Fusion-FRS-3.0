@@ -80,7 +80,8 @@ const createDetectionEl = (name, description) => {
   const detectionEl = document.createElement("div");
   detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${description===null ? '' : `<p class="detectionDesc">${description}</p>`}`;
   detectionEl.classList.add("detectionEntry");
-  detectionList.appendChild(detectionEl);
+  detectionList.replaceChildren(detectionEl);
+  // detectionList.appendChild(detectionEl);
 };
 
 const setBBoxPos = (bboxEl, bbox, width, height) => {
@@ -151,6 +152,7 @@ const fetchDetections = () => {
         try {
           if (parts.length > 1) {
             data = JSON.parse(parts[parts.length - 2])?.data;
+            // console.log(data[0].label + "\r")
           }
         } catch (err) {
           console.log(buffer);

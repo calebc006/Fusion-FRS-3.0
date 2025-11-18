@@ -11,7 +11,7 @@ const videoContainer = document.getElementById("video-container");
 const closeVideoModal = document.getElementById("close-video-modal");
 const modalOverlay = document.querySelector(".modal-overlay");
 
-const isVideoVisible = localStorage.getItem("videoVisible") === "true";
+let isVideoVisible = localStorage.getItem("videoVisible") === "true";
 if (isVideoVisible) {
   videoModal.classList.remove("hidden");
 } else {
