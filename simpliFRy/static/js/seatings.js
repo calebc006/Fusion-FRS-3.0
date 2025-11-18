@@ -6,6 +6,11 @@ window.addEventListener("DOMContentLoaded", () => {
   loadNamelistJSON().then(()=> {
     fetchDetections();
   });
+
+  // restore state of lock toggle
+  const lockToggle = document.getElementById("lock-tables")
+  lockToggle.checked = localStorage.getItem("locked") === "true"
+
 });
 
 const toggleSeatingsButton = document.getElementById("toggle-seating-button")
@@ -72,7 +77,6 @@ const pushHistory = () => {
 const restoreState = (state) => {
   const container = document.getElementById("seatings-container");
   if (!container) return;
-
   // Remove all existing boxes
   container.querySelectorAll(".box").forEach(el => el.remove());
 

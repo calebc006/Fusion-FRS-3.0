@@ -76,13 +76,24 @@ const updateCountryFlag = (detectionName) => {
 };
 
 // Update detection list
-const createDetectionEl = (name, description) => {
+const addDetectionEl = (name, description) => {
   const detectionEl = document.createElement("div");
   detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${description===null ? '' : `<p class="detectionDesc">${description}</p>`}`;
   detectionEl.classList.add("detectionEntry");
-  detectionList.replaceChildren(detectionEl);
-  // detectionList.appendChild(detectionEl);
+  
+  detectionList.appendChild(detectionEl);
+  
+  // show last N detections
+  const N = 2
+  if (detectionList.children.length > N) {
+    detectionList.replaceChildren(...sortDetections([...detectionList.children]).slice(-N))
+  }
 };
+
+// takes in an array of HTML detection elements and returns a sorted list 
+const sortDetections = (detectionList) => {
+  return detectionList
+}
 
 const setBBoxPos = (bboxEl, bbox, width, height) => {
   let ratiod_height = height, ratiod_width = width;
@@ -179,9 +190,14 @@ const updateDetections = (data) => {
   data.forEach((detection) => {
     const unknown = detection.label === "Unknown";
 
+    // if you want to hide unknown bboxes
+    if (unknown) {
+      return;
+    }
+
     if (!unknown && !uniqueLabels.has(detection.label)) {
       description = getDescription(detection.label)
-      createDetectionEl(detection.label, description);
+      addDetectionEl(detection.label, description);
       uniqueLabels.add(detection.label);
     }
 
