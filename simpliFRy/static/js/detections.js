@@ -5,6 +5,10 @@ let latestDetection = null;
 const detectionList = document.getElementById("detections-list");
 const countryFlagImg = document.getElementById("country-flag-img");
 
+window.addEventListener("DOMContentLoaded", () => {
+  loadNamelistJSON();
+});
+
 // Load fusion.json data
 const loadNamelistJSON = async () => {
   try {
@@ -18,10 +22,6 @@ const loadNamelistJSON = async () => {
     console.error('Error loading namelist.json:', error);
   }
 };
-
-window.addEventListener("DOMContentLoaded", () => {
-  loadNamelistJSON();
-});
 
 // Get country flag path for a given name
 const getCountryFlag = (name) => {
@@ -84,15 +84,17 @@ const addDetectionEl = (name, description) => {
   detectionList.appendChild(detectionEl);
   
   // show last N detections
-  const N = 2
+  const N = 3
   if (detectionList.children.length > N) {
     detectionList.replaceChildren(...sortDetections([...detectionList.children]).slice(-N))
+  } else {
+    detectionList.replaceChildren(...sortDetections([...detectionList.children]))
   }
 };
 
 // takes in an array of HTML detection elements and returns a sorted list 
 const sortDetections = (detectionList) => {
-  return detectionList
+  return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText))
 }
 
 const setBBoxPos = (bboxEl, bbox, width, height) => {
@@ -146,6 +148,7 @@ const fetchDetections = () => {
   let data = [];
 
   fetch(`/frResults`).then(response => {
+    console.log("done")
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
@@ -175,6 +178,7 @@ const fetchDetections = () => {
         if (streamCheck) processStream();
       });
     };
+
     processStream();
   });
 };

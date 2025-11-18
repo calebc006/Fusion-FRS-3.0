@@ -437,7 +437,8 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// LIGHTING FUNCTIONALITY
+// ------------ LIGHTING FUNCTIONALITY --------------
+
 const loadNamelistJSON = async () => {
   try {
     const response = await fetch('/data/namelist.json');
@@ -480,8 +481,7 @@ const fetchDetections = () => {
         }
 
         buffer = parts[parts.length - 1];
-
-        // console.log("updating...", data)
+        
         updateTables(data)
 
         processStream()
@@ -514,7 +514,6 @@ const updateTable = (tableName) => {
     return table.label === tableName
   }).id
 
-  resetTables()
   const tableEl = document.getElementById(id)
   tableEl.classList.add("highlighted");
 }
@@ -544,15 +543,16 @@ const updateTables = (data) => {
 
     // Track the last non-unknown detection as the most recent
     if (!unknown) {
+      // light up the table
+      updateTable(table)
       mostRecentTable = table;
     }
 
     if (!detection.bbox) return;
   });
 
-  // Light up table for the latest detection
   if (mostRecentTable) {
-    updateTable(mostRecentTable)
+    // updateTable(mostRecentTable)
   } else {
     // No identified detections in current list, hide flag
     resetTables()
