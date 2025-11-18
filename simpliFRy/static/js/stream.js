@@ -9,12 +9,8 @@ const startDisplay = (formEl) => {
     formEl.style.display = 'none'
 
     // Show the main UI
-    const videoFeed = document.getElementById("video-feed")
     const mainContainer = document.getElementById('main-container')
     mainContainer.style.display = 'flex'
-
-    // Start video stream
-    videoFeed.setAttribute('data', '/vidFeed')
 
     // Start detection overlays
     fetchDetections()

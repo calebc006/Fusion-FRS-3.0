@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FR Live</title>
+    <link rel="icon" href="../static/fusionlogo.png" />
+    <link rel="stylesheet" href="../static/css/main.css" />
+    <link rel="stylesheet" href="../static/css/taskbar.css" />
+    <link rel="stylesheet" href="../static/css/seats.css" />
+    <link rel="stylesheet" href="../static/css/old-layout.css" />
+  </head>
+  <body class="bg-image" style="background-image: url('../static/old_bg.png'); ">
+    <!-- Seatings Menu -->
+    <div id="table-menu" style="display: none">
+      <div class="menu-header" id="table-menu-header">
+        <span>Settings</span>
+        <button id="close-menu">×</button>
+      </div>
+      <div class="seating-options">
+        <button id="add-table">Add Table</button>
+        <button id="remove-table">Remove Table</button>
+        <button id="reset-tables">Reset All Tables</button>
+        <div class="lock-toggle">
+          <input type="checkbox" id="lock-tables" />
+          <label for="lock-tables">Lock Tables (Disable Dragging)</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video feed goes here -->
+    <div id="video-container">
+      <object id="video-feed" type="image/jpeg">
+        <img src="../static/default.jpg" alt="default video image" />
+      </object>
+    </div>
+
+    <!-- Detection list goes here -->
+    <div class="table-detection-list" id="table-detection-list"></div>
+
+    <!-- Logos -->
+    <div class="flex-container-logo">
+      <img src="../static/armylogo.png" />
+      <img src="../static/11logo.png" />
+      <img class="fusion-logo" src="../static/fusionlogo.png" />
+    </div>
+
+    <!-- Bottom Taskbar -->
+    <div class="taskbar-placeholder">
+        <div class="taskbar">
+            <button id="toggle-seating-button">Seatings Menu</button>
+        </div>
+    </div>
+
+    <input
+      type="color"
+      id="box-color-picker"
+      style="position: absolute; display: none; z-index: 9999"
+    />
+    <script src="../static/js/taskbar.js"></script>
+    <script src="../static/js/seats.js"></script>
+    <script src="../static/js/oldLayout.js"></script>
+  </body>
+</html>

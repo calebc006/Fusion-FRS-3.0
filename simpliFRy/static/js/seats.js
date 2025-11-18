@@ -1,5 +1,18 @@
 let namelistJSON = null
 
+const loadNamelistJSON = async () => {
+  try {
+    const response = await fetch('/data/namelist.json');
+    if (response.ok) {
+      namelistJSON = await response.json();
+    } else {
+      console.warn('Could not load namelist.json');
+    }
+  } catch (error) {
+    console.error('Error loading namelist.json:', error);
+  }
+};
+
 window.addEventListener("DOMContentLoaded", () => {
   makeMenuDraggable("table-menu", "table-menu-header");
   loadTablesFromStorage();
@@ -407,29 +420,33 @@ function makeMenuDraggable(menuId, handleId) {
   }
 }
 
-document.getElementById("seatings-container").addEventListener("contextmenu", (e) => {
-  const targetBox = e.target.closest(".box");
-  if (!targetBox) return;
+const seatingsContainer = document.getElementById("seatings-container")
+if (seatingsContainer !== null) {
+  seatingsContainer.addEventListener("contextmenu", (e) => {
+    const targetBox = e.target.closest(".box");
+    if (!targetBox) return;
 
-  e.preventDefault();
+    e.preventDefault();
 
-  colorPicker.style.left = `${e.pageX}px`;
-  colorPicker.style.top = `${e.pageY}px`;
-  colorPicker.style.display = "block";
+    colorPicker.style.left = `${e.pageX}px`;
+    colorPicker.style.top = `${e.pageY}px`;
+    colorPicker.style.display = "block";
 
-  const currentColor = rgbToHex(getComputedStyle(targetBox).backgroundColor);
-  colorPicker.value = currentColor;
+    const currentColor = rgbToHex(getComputedStyle(targetBox).backgroundColor);
+    colorPicker.value = currentColor;
 
-  const applyColor = (event) => {
-    targetBox.style.backgroundColor = event.target.value;
-    saveTablesToStorage();
-    pushHistory(); 
-    colorPicker.style.display = "none";
-    colorPicker.removeEventListener("input", applyColor);
-  };
+    const applyColor = (event) => {
+      targetBox.style.backgroundColor = event.target.value;
+      saveTablesToStorage();
+      pushHistory(); 
+      colorPicker.style.display = "none";
+      colorPicker.removeEventListener("input", applyColor);
+    };
 
-  colorPicker.addEventListener("input", applyColor);
-});
+    colorPicker.addEventListener("input", applyColor);
+  });
+}
+
 
 document.addEventListener("click", (e) => {
   if (e.target !== colorPicker) {
@@ -438,19 +455,6 @@ document.addEventListener("click", (e) => {
 });
 
 // ------------ LIGHTING FUNCTIONALITY --------------
-
-const loadNamelistJSON = async () => {
-  try {
-    const response = await fetch('/data/namelist.json');
-    if (response.ok) {
-      namelistJSON = await response.json();
-    } else {
-      console.warn('Could not load namelist.json');
-    }
-  } catch (error) {
-    console.error('Error loading namelist.json:', error);
-  }
-};
 
 // MAIN LOOP
 const fetchDetections = () => {
@@ -482,6 +486,7 @@ const fetchDetections = () => {
         
         updateTables(data)
         updateTableDetections(data)
+        updateBBoxes(data)
         processStream()
       });
     };
@@ -507,13 +512,18 @@ const getTable = (name) => {
 };
 
 const updateTable = (tableName) => {
+  if (tableName == null) {
+    return
+  }
   const tables = JSON.parse(localStorage.getItem("tables"))
   const id = tables.find(table => {
     return table.label === tableName
   }).id
 
   const tableEl = document.getElementById(id)
-  tableEl.classList.add("highlighted");
+  if (tableEl !== null) {
+    tableEl.classList.add("highlighted");
+  }
 }
 
 const resetTables = () => {
@@ -528,7 +538,6 @@ const resetTables = () => {
 
 const updateTables = (data) => {
   const uniqueLabels = new Set();
-  let mostRecentTable = null;
   resetTables()
 
   // Process detections in order of detection (no sorting)
@@ -537,25 +546,18 @@ const updateTables = (data) => {
 
     if (!unknown && !uniqueLabels.has(detection.label)) {
       table = getTable(detection.label); // e.g. "T4"
-      uniqueLabels.add(detection.label);
+      if (table !== null) {
+        uniqueLabels.add(detection.label);
+      }
     }
 
-    // Track the last non-unknown detection as the most recent
     if (!unknown) {
       // light up the table
       updateTable(table)
-      mostRecentTable = table;
     }
 
     if (!detection.bbox) return;
   });
-
-  if (mostRecentTable) {
-    // updateTable(mostRecentTable)
-  } else {
-    // No identified detections in current list, hide flag
-    resetTables()
-  }
 };
 
 // table detection list functionality

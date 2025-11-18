@@ -28,11 +28,13 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
 }
 
 .bg-image {
   background-repeat: no-repeat;
-  background-size: 100%;
+  background-size: cover;
+  background-attachment: fixed;
 }
 
 .title {

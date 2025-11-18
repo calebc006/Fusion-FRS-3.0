@@ -1,0 +1,10 @@
+#video-container {
+    position: absolute;
+    left: 100px;
+    top: 32vh;
+}
+
+#video-feed {
+    width: 55vw;
+
+}

@@ -107,7 +107,7 @@ pip install -r requirements.txt
 If you wish to create a new container, run the following command
 
 ```bash
-docker run -p 1333:1333 -v "C:\Users\Admin\Desktop\FR-FUSION-main\simpliFRy/data:/app/data" --gpus all simplifry-simplifry
+docker run -p 1333:1333 -v "C:\Users\Admin\Desktop\FUSION-FR\simpliFRy\data:/app/data" --gpus all simplifry-simplifry
 ```
 
 Alternatively, you can run docker compose from the `simpliFRy` directory

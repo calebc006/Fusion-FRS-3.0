@@ -34,18 +34,26 @@ const hideVideoModal = () => {
 const openVideoModalButton = document.getElementById("open-video-modal-button");
 if (openVideoModalButton) {
   openVideoModalButton.addEventListener("click", () => {
+    const videoFeed = document.getElementById("video-feed")
+    videoFeed.setAttribute('data', '/vidFeed')
+
     showVideoModal();
   });
 }
 
 closeVideoModal.addEventListener("click", (e) => {
-    hideVideoModal();
+  hideVideoModal();
+  const videoFeed = document.getElementById("video-feed")
+  videoFeed.removeAttribute('data')
+  
 })
 
 document.addEventListener("keydown", (e) => {
   // Close video modal on Escape key
   if (e.key === "Escape" && !videoModal.classList.contains("hidden")) {
     hideVideoModal();
+    const videoFeed = document.getElementById("video-feed")
+    videoFeed.removeAttribute('data')
   }
 });
 

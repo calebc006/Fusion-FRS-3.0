@@ -28,6 +28,14 @@ parser.add_argument(
     required=False,
     default="1333",
 )
+parser.add_argument(
+    "-v",
+    "--video",
+    type=str,
+    help="Enable the video feed (default true)",
+    required=False,
+    default="true",
+)
 
 args = parser.parse_args()
 
@@ -92,14 +100,17 @@ def check_alive():
 
     return Response(response, status=200, mimetype='application/json')
 
-
 @app.route("/vidFeed")
 def video_feed():
     """Returns a HTTP streaming response of the video feed from FFMPEG"""
+    vid_enabled = args.video == "true"
 
-    return Response(
-        fr_instance.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame"
-    )
+    if vid_enabled:
+        return Response(
+            fr_instance.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame"
+        )
+    else:
+        Response("Video stream is not enabled", status=405, mimetype='application/json')
 
 
 @app.route("/frResults")
@@ -152,10 +163,16 @@ def index():
     return render_template("index.html")
 
 @app.route("/seats")
-def face():
+def seats():
     """Renders a page with the seating plan, with seats that light up upon detection."""
 
     return render_template("seats.html")
+
+@app.route("/old_layout")
+def oldlayout():
+    """Renders the old layout with video on the left and detection list on the right"""
+
+    return render_template("old_layout.html")
 
 @app.route('/data/<path:filename>')
 def serve_data(filename):
