@@ -118,40 +118,48 @@ const restoreState = (state) => {
 let boxCount = 0;
 
 const loadTablesFromStorage = () => {
-  const savedTables = JSON.parse(localStorage.getItem("tables") || "[]");
-  boxCount = savedTables.length;
-  savedTables.forEach(({ id, x, y, label, color, width, height }) => {
-    const newBox = document.createElement("div");
-    newBox.className = `box ${id}`;
-    newBox.id = id;
-    newBox.innerHTML = `<div class="box-label">${label}</div>`;
-    newBox.style.left = `${x}px`;
-    newBox.style.top = `${y}px`;
-    newBox.style.backgroundColor = color;
-    newBox.style.width = `${width}px`;
-    newBox.style.height = `${height}px`;
-    const container = document.getElementById("seatings-container");
-    if (container) {
-      container.appendChild(newBox);
-    }
-    makeDraggableBox(newBox);
-  });
+  try {
+    const savedTables = JSON.parse(localStorage.getItem("tables") || "[]");
+    boxCount = savedTables.length;
+    savedTables.forEach(({ id, x, y, label, color, width, height }) => {
+      const newBox = document.createElement("div");
+      newBox.className = `box ${id}`;
+      newBox.id = id;
+      newBox.innerHTML = `<div class="box-label">${label}</div>`;
+      newBox.style.left = `${x}px`;
+      newBox.style.top = `${y}px`;
+      newBox.style.backgroundColor = color;
+      newBox.style.width = `${width}px`;
+      newBox.style.height = `${height}px`;
+      const container = document.getElementById("seatings-container");
+      if (container) {
+        container.appendChild(newBox);
+      }
+      makeDraggableBox(newBox);
+    });
+  } catch (error) {
+    console.error('Error loading tables from storage:', error);
+  }
 };
 
 const saveTablesToStorage = () => {
-  const boxes = document.querySelectorAll("#seatings-container .box");
-  const tableData = Array.from(boxes).map((box) => {
-    return {
-      id: box.classList[1],
-      label: box.querySelector(".box-label")?.innerText || "",
-      x: box.offsetLeft,
-      y: box.offsetTop,
-      color: box.style.backgroundColor,
-      width: box.offsetWidth,
-      height: box.offsetHeight,
-    };
-  });
-  localStorage.setItem("tables", JSON.stringify(tableData));
+  try {
+    const boxes = document.querySelectorAll("#seatings-container .box");
+    const tableData = Array.from(boxes).map((box) => {
+      return {
+        id: box.classList[1],
+        label: box.querySelector(".box-label")?.innerText || "",
+        x: box.offsetLeft,
+        y: box.offsetTop,
+        color: box.style.backgroundColor,
+        width: box.offsetWidth,
+        height: box.offsetHeight,
+      };
+    });
+    localStorage.setItem("tables", JSON.stringify(tableData));
+  } catch (error) {
+    console.error('Error saving tables to storage:', error);
+  }
 };
 
 const randomColor = () => {
@@ -202,7 +210,7 @@ const createDeleteBtn = (box) => {
 const createResizeSlider = (box) => {
   const sliderWrapper = document.createElement("div");
   sliderWrapper.className = "resize-slider-wrapper";
-  sliderWrapper.style.display = localStorage.getItem("tables") ? "none" : "flex";
+  sliderWrapper.style.display = 'flex';
 
   const label = document.createElement("span");
   label.className = "slider-label";
@@ -336,9 +344,9 @@ document.getElementById("lock-tables").addEventListener("change", () => {
       deleteBtn.style.display = locked ? "none" : "block";
     }
 
-    const sliderWrapper = box.querySelector(".resize-slider-wrapper");
-    if (sliderWrapper) {
-      sliderWrapper.style.display = locked ? "none" : "flex";
+    const resizeSlider = box.getElementsByClassName("resize-slider-wrapper")[0].querySelector("input")
+    if (resizeSlider) {
+      resizeSlider.style.display = locked ? "none" : "block";
     }
   });
 });
@@ -463,35 +471,63 @@ const fetchDetections = () => {
   let data = [];
 
   fetch(`/frResults`).then(response => {
+    if (!response.ok || !response.body) {
+      console.error('Fetch failed, retrying...');
+      setTimeout(() => fetchDetections(), 5000);
+      return;
+    }
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
     const processStream = () => {
       reader.read().then(({ done, value }) => {
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-
-        const parts = buffer.split('\n');
-
         try {
-          if (parts.length > 1) {
-            data = JSON.parse(parts[parts.length - 2])?.data;
+          if (done) {
+            console.log('Stream ended, reconnecting...');
+            setTimeout(() => fetchDetections(), 2000);
+            return;
           }
-        } catch (err) {
-          console.log(buffer);
-          console.error('Error parsing JSON:', err);
-        }
 
-        buffer = parts[parts.length - 1];
-        
-        updateTables(data)
-        updateTableDetections(data)
-        updateBBoxes(data)
-        processStream()
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          const parts = buffer.split('\n');
+
+          try {
+            if (parts.length > 1) {
+              data = JSON.parse(parts[parts.length - 2])?.data || [];
+            }
+          } catch (err) {
+            console.error('Error parsing JSON:', err);
+            data = [];
+          }
+
+          buffer = parts[parts.length - 1] || '';
+          
+          if (Array.isArray(data)) {
+            updateTables(data);
+            updateTableDetections(data);
+            if (document.URL.includes("old_layout")) { // hacky and not good practice. will refactor in the future.
+              updateBBoxes(data);
+            }
+          }
+          
+          processStream();
+        } catch (error) {
+          console.error('Error in processStream:', error);
+          setTimeout(() => fetchDetections(), 2000);
+        }
+      }).catch(error => {
+        console.error('Error reading stream:', error);
+        setTimeout(() => fetchDetections(), 2000);
       });
     };
 
     processStream();
+  }).catch(error => {
+    console.error('Error fetching detections:', error);
+    setTimeout(() => fetchDetections(), 5000);
   });
 };
 
