@@ -171,15 +171,15 @@ background-color: rgba(0, 0, 0, 0.5);  /* Optional: Add a background color when 
 
 .table-detection-list {
   position: absolute;
-  top: 30vh;
-  left: 67vw;
+  top: 25vh;
+  left: 60vw;
   width: 30vw;
   padding-left: 10px;
   padding-right: 10px;
 }
 
 .table-detection-element {
-  font-size: 35px;
+  font-size: 40px;
   font-family: Helvetica, sans-serif;
   color: black;
   margin-bottom: 10px;

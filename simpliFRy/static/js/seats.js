@@ -163,8 +163,8 @@ const saveTablesToStorage = () => {
 };
 
 const randomColor = () => {
-  // const colors = ["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0"];
-  const colors = ["#e6194b"];
+  const colors = ["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0"];
+  // const colors = ["#e6194b"];
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
@@ -578,7 +578,7 @@ const updateTables = (data) => {
 
   // Process detections in order of detection (no sorting)
   data.forEach((detection) => {
-    const unknown = detection.label === "Unknown";
+    const unknown = detection.label === "UNKNOWN";
 
     if (!unknown && !uniqueLabels.has(detection.label)) {
       table = getTable(detection.label); // e.g. "T4"
@@ -604,8 +604,8 @@ const updateTableDetections = (data) => {
   let detections = []
 
   data.forEach(detection => {
-    const name = detection.label
-    if (name == "Unknown") {
+    const name = detection.label.toUpperCase()
+    if (name == "UNKNOWN") {
       return
     }
     const table = getTable(name)
