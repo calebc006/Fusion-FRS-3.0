@@ -28,11 +28,13 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
 }
 
 .bg-image {
   background-repeat: no-repeat;
-  background-size: 100%;
+  background-size: cover;
+  background-attachment: fixed;
 }
 
 .title {
@@ -45,4 +47,80 @@ body {
 
 .hidden-object {
   display: none
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  .modal-header {
+    padding: 0.75em 1em;
+  }
+
+  .modal-header h2 {
+    font-size: 1.2em;
+  }
+
+  #video-container {
+    padding: 1em;
+  }
+}
+
+.bbox {
+  position: absolute;
+  background-color: transparent;
+  border: 5px solid red;
+  border-radius: 5px;
+}
+
+.bbox-identified {
+  border-color: blue;
+}
+
+.bbox-label {
+  font-size: 100%;
+  font-weight: bold;
+  color: red;
+  position: absolute;
+  width: max-content;
+  top: -3em;
+  left: 50%;
+  -webkit-transform: translateX(-50%);
+  transform: translateX(-50%);
+}
+
+.bbox-label-identified {
+  color: blue;
+}
+
+.bbox-score {
+  margin-left: 10px;
+  font-style: italic;
+}
+
+.flex-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.flex-container-logo {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  height: 100px;
+  width: auto;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  opacity: 70%;
+}
+
+.fusion-logo {
+  padding-top: 10px;
+  height: 80px;
+  width: auto;
+  margin-right: 20px;
 }

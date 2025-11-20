@@ -2,6 +2,7 @@ import io
 import json
 import os
 import threading
+import traceback
 from datetime import datetime, timedelta
 from typing import Generator, TypedDict
 
@@ -274,7 +275,10 @@ class FRVidPlayer(VideoPlayer):
 
         # Make sure its type float32
         embed = np.asarray(embed, dtype=np.float32)
-        return np.linalg.norm(embed)
+        norm = np.linalg.norm(embed)
+        if norm == 0:
+            return embed
+        return embed / norm
 
     def _catch_recent(self, embed: np.ndarray, score: np.float32, bbox: list[float]) -> tuple[str, np.ndarray]:
         """
@@ -372,21 +376,33 @@ class FRVidPlayer(VideoPlayer):
         - list of recognised faces, their scores and bounding boxes (typed dictionary)    
         """
 
-        img = Image.open(io.BytesIO(frame_bytes)).convert("RGB")
+        try:
+            img = Image.open(io.BytesIO(frame_bytes)).convert("RGB")
 
-        width, height = img.size
-        img = np.array(img)
+            width, height = img.size
+            img = np.array(img)
 
-        faces = self.model.get(img)
-        embeddings_list = [face.embedding for face in faces]
+            faces = self.model.get(img)
+            embeddings_list = [face.embedding for face in faces]
 
-        if len(embeddings_list) == 0:
+            if len(embeddings_list) == 0:
+                extra_labels = self._update_recent_detections([])
+                return [{"label": label} for label in extra_labels]
+
+            if len(self.name_list) == 0:
+                # No embeddings loaded, return empty results
+                extra_labels = self._update_recent_detections([])
+                return [{"label": label} for label in extra_labels]
+
+            neighbours, distances = self.vector_index.query(
+                embeddings_list, k=min(2, len(self.name_list))
+            )
+        except Exception as e:
+            log_info(f"Error in infer method: {e}")
+            log_info(traceback.format_exc())
+            # Return empty results instead of crashing
             extra_labels = self._update_recent_detections([])
             return [{"label": label} for label in extra_labels]
-
-        neighbours, distances = self.vector_index.query(
-            embeddings_list, k=min(2, len(self.name_list))
-        )
 
         labels = []
         updated_recent_detections : list[RecentDetection] = []  # Same format as recent_detections
@@ -446,7 +462,13 @@ class FRVidPlayer(VideoPlayer):
                 results = self.infer(frame_bytes)
                 with self.inference_lock:
                     self.fr_results = results
-            except AttributeError:
+            except AttributeError as e:
+                log_info(f"Error in inference loop: {e}")
+                continue
+            except Exception as e:
+                log_info(f"Error in inference loop: {e}")
+                log_info(traceback.format_exc())
+                # Continue processing instead of crashing
                 continue
         else:
             self._reset_vector_index()
@@ -468,6 +490,12 @@ class FRVidPlayer(VideoPlayer):
         - Generator yielding FR detection results (list of typed dictionary)
         """
 
-        while self.inferenceThread.is_alive():
-            with self.inference_lock:
-                yield json.dumps({"data": self.fr_results}) + '\n'
+        while hasattr(self, 'inferenceThread') and self.inferenceThread.is_alive():
+            try:
+                with self.inference_lock:
+                    yield json.dumps({"data": self.fr_results}) + '\n'
+            except Exception as e:
+                log_info(f"Error in detection broadcast: {e}")
+                log_info(traceback.format_exc())
+                # Yield empty results instead of crashing
+                yield json.dumps({"data": []}) + '\n'

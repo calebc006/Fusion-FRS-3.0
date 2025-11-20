@@ -11,7 +11,7 @@ const videoContainer = document.getElementById("video-container");
 const closeVideoModal = document.getElementById("close-video-modal");
 const modalOverlay = document.querySelector(".modal-overlay");
 
-const isVideoVisible = localStorage.getItem("videoVisible") === "true";
+let isVideoVisible = localStorage.getItem("videoVisible") === "true";
 if (isVideoVisible) {
   videoModal.classList.remove("hidden");
 } else {
@@ -34,18 +34,43 @@ const hideVideoModal = () => {
 const openVideoModalButton = document.getElementById("open-video-modal-button");
 if (openVideoModalButton) {
   openVideoModalButton.addEventListener("click", () => {
+    const videoFeed = document.getElementById("video-feed")
+    videoFeed.setAttribute('data', '/vidFeed')
+
     showVideoModal();
   });
 }
 
 closeVideoModal.addEventListener("click", (e) => {
-    hideVideoModal();
+  hideVideoModal();
+  const videoFeed = document.getElementById("video-feed")
+  videoFeed.removeAttribute('data')
+  
 })
 
 document.addEventListener("keydown", (e) => {
   // Close video modal on Escape key
   if (e.key === "Escape" && !videoModal.classList.contains("hidden")) {
     hideVideoModal();
+    const videoFeed = document.getElementById("video-feed")
+    videoFeed.removeAttribute('data')
   }
 });
 
+// button to end stream
+document.getElementById("end_stream_button").addEventListener("click", async (event) => {
+    // Handles form submission to end stream
+
+    event.preventDefault()
+    endDetections()
+    document.getElementById("video-feed").removeAttribute('data')
+
+    fetch('/end', {
+        method: 'POST'
+    }).then(response => response.json()).then(_data => {
+        document.getElementById("main-container").style.display = 'none'
+        document.getElementById("init").style.display = 'flex'
+    }).catch(error => {
+        console.log(error)
+    })
+})

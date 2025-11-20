@@ -5,6 +5,10 @@ let latestDetection = null;
 const detectionList = document.getElementById("detections-list");
 const countryFlagImg = document.getElementById("country-flag-img");
 
+window.addEventListener("DOMContentLoaded", () => {
+  loadNamelistJSON();
+});
+
 // Load fusion.json data
 const loadNamelistJSON = async () => {
   try {
@@ -18,10 +22,6 @@ const loadNamelistJSON = async () => {
     console.error('Error loading namelist.json:', error);
   }
 };
-
-window.addEventListener("DOMContentLoaded", () => {
-  loadNamelistJSON();
-});
 
 // Get country flag path for a given name
 const getCountryFlag = (name) => {
@@ -76,12 +76,26 @@ const updateCountryFlag = (detectionName) => {
 };
 
 // Update detection list
-const createDetectionEl = (name, description) => {
+const addDetectionEl = (name, description) => {
   const detectionEl = document.createElement("div");
   detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${description===null ? '' : `<p class="detectionDesc">${description}</p>`}`;
   detectionEl.classList.add("detectionEntry");
+  
   detectionList.appendChild(detectionEl);
+  
+  // show last N detections
+  const N = 3
+  if (detectionList.children.length > N) {
+    detectionList.replaceChildren(...sortDetections([...detectionList.children]).slice(-N))
+  } else {
+    detectionList.replaceChildren(...sortDetections([...detectionList.children]))
+  }
 };
+
+// takes in an array of HTML detection elements and returns a sorted list 
+const sortDetections = (detectionList) => {
+  return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText))
+}
 
 const setBBoxPos = (bboxEl, bbox, width, height) => {
   let ratiod_height = height, ratiod_width = width;
@@ -151,6 +165,7 @@ const fetchDetections = () => {
         try {
           if (parts.length > 1) {
             data = JSON.parse(parts[parts.length - 2])?.data;
+            // console.log(data[0].label + "\r")
           }
         } catch (err) {
           console.log(buffer);
@@ -162,6 +177,7 @@ const fetchDetections = () => {
         if (streamCheck) processStream();
       });
     };
+
     processStream();
   });
 };
@@ -177,9 +193,14 @@ const updateDetections = (data) => {
   data.forEach((detection) => {
     const unknown = detection.label === "Unknown";
 
+    // if you want to hide unknown bboxes
+    // if (unknown) {
+    //   return;
+    // }
+
     if (!unknown && !uniqueLabels.has(detection.label)) {
       description = getDescription(detection.label)
-      createDetectionEl(detection.label, description);
+      addDetectionEl(detection.label, description);
       uniqueLabels.add(detection.label);
     }
 
@@ -196,7 +217,11 @@ const updateDetections = (data) => {
       bboxEl.classList.add("bbox-identified");
     }
 
+    // old UI for blue and red boxes
     bboxEl.innerHTML = `<p class="bbox-label${unknown ? "" : " bbox-label-identified"}">${detection.label} <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
+
+    // new UI with all blue boxes
+    // bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
 
     currData.push(detection.bbox);
     setBBoxPos(bboxEl, detection.bbox, videoContainer.offsetWidth, videoContainer.offsetHeight);

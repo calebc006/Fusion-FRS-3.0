@@ -107,7 +107,7 @@ pip install -r requirements.txt
 If you wish to create a new container, run the following command
 
 ```bash
-docker run -p 1333:1333 -v "C:\Users\Admin\Desktop\FR-FUSION-main\simpliFRy/data:/app/data" --gpus all simplifry-simplifry
+docker run -p 1333:1333 -v "C:\Users\Admin\Desktop\FUSION-FR\simpliFRy\data:/app/data" --gpus all simplifry-simplifry
 ```
 
 Alternatively, you can run docker compose from the `simpliFRy` directory
@@ -132,7 +132,7 @@ docker compose up --no-build
 
 If you do have an existing container, you can start it from the Docker Desktop application
 
-### Without Docker (not recommended)
+### Without Docker (for development only)
 
 Run the `app.py` script in the simpliFRy virtual environment
 
@@ -144,23 +144,26 @@ py app.py
 
 To conduct facial recognition, you need to load images of people you wish to be recognised into simpliFRy. Each person can have 1 or more pictures.
 
-1. From the `simpliFRy/data` folder (created automatically when starting the app), create a folder called `faces`.
+1. From the `simpliFRy/data` folder (created automatically when starting the app), create a new directory with all the images of the people you wish to be detected.
 
-2. Place all the images of people you wish to be detected within the `faces` folder.
+2. In the `simpliFRy/data` folder, create a JSON file named `namelist.json` that maps the image file name with the name of the person to be recognised. Format it as shown below:
 
-3. In the `simpliFRy/data` folder, create a JSON file that maps the image file name with the name of the person to be recognised (you can call it anything, such as `personnel.json`). Format it like below.
-
-```js
+```json
+// namelist.json
 {
   "img_folder_path": "path/to/image/folder",
   "details": [
     {
       "name": "Person One",
-      "images": ["image1.jpg", "image2.png"]
+      "images": ["image1.jpg", "image2.png"],
+      "description": "Chief of Army, Redland Armed Forces",
+      "table": "T1"
     },
     {
       "name": "Person Two",
-      "images": ["image3.jpg", "image4.png"]
+      "images": ["image3.jpg", "image4.png"],
+      "description": "Janitor",
+      "table": "T2"
     }
     // Other similar entries as above
   ]
@@ -180,11 +183,11 @@ simpliFRy/
 |   |   ├── john_doe1.jpg
 |   |   ├── john_doe2.png
 |   |   └── jane_smith.png
-|   └── personnel.json
+|   └── namelist.json
 └── other files and folders
 ```
 
-`personnel.json` would look like this
+`namelist.json` would look like this
 
 ```json
 {
@@ -192,11 +195,15 @@ simpliFRy/
   "details": [
     {
       "name": "John Doe",
-      "images": ["john_doe1.jpg", "john_doe2.png"]
+      "images": ["john_doe1.jpg", "john_doe2.png"],
+      "description": "whatever",
+      "table": "anything"
     },
     {
       "name": "Jane Smith",
-      "images": ["jane_smith.png"]
+      "images": ["jane_smith.png"],
+      "description": "something",
+      "table": "doesn't matter"
     }
   ]
 }
@@ -219,7 +226,7 @@ simpliFRy/
 |   |   ├── john_doe1.jpg
 |   |   ├── john_doe2.png
 |   |   └── jane_smith.png
-|   └── personnel.json
+|   └── namelist.json
 └── other files and folders
 ```
 

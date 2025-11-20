@@ -1,3 +1,30 @@
+let namelistJSON = null
+
+const loadNamelistJSON = async () => {
+  try {
+    const response = await fetch('/data/namelist.json');
+    if (response.ok) {
+      namelistJSON = await response.json();
+    } else {
+      console.warn('Could not load namelist.json');
+    }
+  } catch (error) {
+    console.error('Error loading namelist.json:', error);
+  }
+};
+
+window.addEventListener("DOMContentLoaded", () => {
+  makeMenuDraggable("table-menu", "table-menu-header");
+  loadTablesFromStorage();
+  loadNamelistJSON().then(()=> {
+    fetchDetections();
+  });
+
+  // restore state of lock toggle
+  const lockToggle = document.getElementById("lock-tables")
+  lockToggle.checked = localStorage.getItem("locked") === "true"
+
+});
 
 const toggleSeatingsButton = document.getElementById("toggle-seating-button")
 
@@ -63,7 +90,6 @@ const pushHistory = () => {
 const restoreState = (state) => {
   const container = document.getElementById("seatings-container");
   if (!container) return;
-
   // Remove all existing boxes
   container.querySelectorAll(".box").forEach(el => el.remove());
 
@@ -73,6 +99,7 @@ const restoreState = (state) => {
   state.forEach(({ id, x, y, label, color, width, height }) => {
     const newBox = document.createElement("div");
     newBox.className = `box ${id}`;
+    newBox.id = id
     newBox.innerHTML = `<div class="box-label">${label}</div>`;
     newBox.style.left = `${x}px`;
     newBox.style.top = `${y}px`;
@@ -91,43 +118,53 @@ const restoreState = (state) => {
 let boxCount = 0;
 
 const loadTablesFromStorage = () => {
-  const savedTables = JSON.parse(localStorage.getItem("tables") || "[]");
-  boxCount = savedTables.length;
-  savedTables.forEach(({ id, x, y, label, color, width, height }) => {
-    const newBox = document.createElement("div");
-    newBox.className = `box ${id}`;
-    newBox.innerHTML = `<div class="box-label">${label}</div>`;
-    newBox.style.left = `${x}px`;
-    newBox.style.top = `${y}px`;
-    newBox.style.backgroundColor = color;
-    newBox.style.width = `${width}px`;
-    newBox.style.height = `${height}px`;
-    const container = document.getElementById("seatings-container");
-    if (container) {
-      container.appendChild(newBox);
-    }
-    makeDraggableBox(newBox);
-  });
+  try {
+    const savedTables = JSON.parse(localStorage.getItem("tables") || "[]");
+    boxCount = savedTables.length;
+    savedTables.forEach(({ id, x, y, label, color, width, height }) => {
+      const newBox = document.createElement("div");
+      newBox.className = `box ${id}`;
+      newBox.id = id;
+      newBox.innerHTML = `<div class="box-label">${label}</div>`;
+      newBox.style.left = `${x}px`;
+      newBox.style.top = `${y}px`;
+      newBox.style.backgroundColor = color;
+      newBox.style.width = `${width}px`;
+      newBox.style.height = `${height}px`;
+      const container = document.getElementById("seatings-container");
+      if (container) {
+        container.appendChild(newBox);
+      }
+      makeDraggableBox(newBox);
+    });
+  } catch (error) {
+    console.error('Error loading tables from storage:', error);
+  }
 };
 
 const saveTablesToStorage = () => {
-  const boxes = document.querySelectorAll("#seatings-container .box");
-  const tableData = Array.from(boxes).map((box) => {
-    return {
-      id: box.classList[1],
-      label: box.querySelector(".box-label")?.innerText || "",
-      x: box.offsetLeft,
-      y: box.offsetTop,
-      color: box.style.backgroundColor,
-      width: box.offsetWidth,
-      height: box.offsetHeight,
-    };
-  });
-  localStorage.setItem("tables", JSON.stringify(tableData));
+  try {
+    const boxes = document.querySelectorAll("#seatings-container .box");
+    const tableData = Array.from(boxes).map((box) => {
+      return {
+        id: box.classList[1],
+        label: box.querySelector(".box-label")?.innerText || "",
+        x: box.offsetLeft,
+        y: box.offsetTop,
+        color: box.style.backgroundColor,
+        width: box.offsetWidth,
+        height: box.offsetHeight,
+      };
+    });
+    localStorage.setItem("tables", JSON.stringify(tableData));
+  } catch (error) {
+    console.error('Error saving tables to storage:', error);
+  }
 };
 
 const randomColor = () => {
   const colors = ["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0"];
+  // const colors = ["#e6194b"];
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
@@ -173,7 +210,7 @@ const createDeleteBtn = (box) => {
 const createResizeSlider = (box) => {
   const sliderWrapper = document.createElement("div");
   sliderWrapper.className = "resize-slider-wrapper";
-  sliderWrapper.style.display = document.getElementById("lock-tables").checked ? "none" : "flex";
+  sliderWrapper.style.display = 'flex';
 
   const label = document.createElement("span");
   label.className = "slider-label";
@@ -210,7 +247,7 @@ const makeDraggableBox = (box) => {
   createDeleteBtn(box)
 
   // Respect current lock state
-  box.style.pointerEvents = document.getElementById("lock-tables").checked ? "none" : "auto";
+  box.style.pointerEvents = localStorage.getItem("locked") === "true" ? "none" : "auto";
 
   // Enable renaming, show slider and delete-btn when clicking on the table name
   box.addEventListener("click", (e) => {
@@ -219,7 +256,7 @@ const makeDraggableBox = (box) => {
     resizeSlider.style.display = "block"
     deleteBtn.style.display = "block"
 
-    if (document.getElementById("lock-tables").checked) return; // Prevent renaming if locked
+    if (localStorage.getItem("locked") === "true") return; // Prevent renaming if locked
 
     const labelEl = box.querySelector(".box-label");
     const label = labelEl?.innerText.trim() || "";
@@ -271,7 +308,7 @@ const makeDraggableBox = (box) => {
 
   // dragging logic
   box.addEventListener("mousedown", (e) => {
-    if (document.getElementById("lock-tables").checked) return; // Prevent drag if locked
+    if (localStorage.getItem("locked") === "true") return; // Prevent drag if locked
 
     let offsetX = e.clientX - box.offsetLeft;
     let offsetY = e.clientY - box.offsetTop;
@@ -296,7 +333,8 @@ const makeDraggableBox = (box) => {
 
 document.getElementById("lock-tables").addEventListener("change", () => {
   const boxes = document.querySelectorAll("#seatings-container .box");
-  const locked = document.getElementById("lock-tables").checked;
+  localStorage.setItem("locked", localStorage.getItem("locked") === "true" ? "false" : "true")
+  const locked = localStorage.getItem("locked") === "true";
 
   boxes.forEach((box) => {  
     box.style.pointerEvents = locked ? "none" : "auto";
@@ -306,9 +344,9 @@ document.getElementById("lock-tables").addEventListener("change", () => {
       deleteBtn.style.display = locked ? "none" : "block";
     }
 
-    const sliderWrapper = box.querySelector(".resize-slider-wrapper");
-    if (sliderWrapper) {
-      sliderWrapper.style.display = locked ? "none" : "flex";
+    const resizeSlider = box.getElementsByClassName("resize-slider-wrapper")[0].querySelector("input")
+    if (resizeSlider) {
+      resizeSlider.style.display = locked ? "none" : "block";
     }
   });
 });
@@ -321,6 +359,7 @@ document.getElementById("add-table").addEventListener("click", () => {
   boxCount += 1;
   const newBox = document.createElement("div");
   newBox.className = `box box${boxCount}`;
+  newBox.id = `box${boxCount}`;
   newBox.innerHTML = `<div class="box-label">T${boxCount}</div>`;
   newBox.style.backgroundColor = randomColor();
   const container = document.getElementById("seatings-container");
@@ -389,36 +428,199 @@ function makeMenuDraggable(menuId, handleId) {
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  makeMenuDraggable("table-menu", "table-menu-header");
-});
+const seatingsContainer = document.getElementById("seatings-container")
+if (seatingsContainer !== null) {
+  seatingsContainer.addEventListener("contextmenu", (e) => {
+    const targetBox = e.target.closest(".box");
+    if (!targetBox) return;
 
-document.getElementById("seatings-container").addEventListener("contextmenu", (e) => {
-  const targetBox = e.target.closest(".box");
-  if (!targetBox) return;
+    e.preventDefault();
 
-  e.preventDefault();
+    colorPicker.style.left = `${e.pageX}px`;
+    colorPicker.style.top = `${e.pageY}px`;
+    colorPicker.style.display = "block";
 
-  colorPicker.style.left = `${e.pageX}px`;
-  colorPicker.style.top = `${e.pageY}px`;
-  colorPicker.style.display = "block";
+    const currentColor = rgbToHex(getComputedStyle(targetBox).backgroundColor);
+    colorPicker.value = currentColor;
 
-  const currentColor = rgbToHex(getComputedStyle(targetBox).backgroundColor);
-  colorPicker.value = currentColor;
+    const applyColor = (event) => {
+      targetBox.style.backgroundColor = event.target.value;
+      saveTablesToStorage();
+      pushHistory(); 
+      colorPicker.style.display = "none";
+      colorPicker.removeEventListener("input", applyColor);
+    };
 
-  const applyColor = (event) => {
-    targetBox.style.backgroundColor = event.target.value;
-    saveTablesToStorage();
-    pushHistory(); 
-    colorPicker.style.display = "none";
-    colorPicker.removeEventListener("input", applyColor);
-  };
+    colorPicker.addEventListener("input", applyColor);
+  });
+}
 
-  colorPicker.addEventListener("input", applyColor);
-});
 
 document.addEventListener("click", (e) => {
   if (e.target !== colorPicker) {
     colorPicker.style.display = "none";
   }
 });
+
+// ------------ LIGHTING FUNCTIONALITY --------------
+
+// MAIN LOOP
+const fetchDetections = () => {
+  console.log("FETCHING...");
+  let buffer = '';
+  let data = [];
+
+  fetch(`/frResults`).then(response => {
+    if (!response.ok || !response.body) {
+      console.error('Fetch failed, retrying...');
+      setTimeout(() => fetchDetections(), 5000);
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    const processStream = () => {
+      reader.read().then(({ done, value }) => {
+        try {
+          if (done) {
+            console.log('Stream ended, reconnecting...');
+            setTimeout(() => fetchDetections(), 2000);
+            return;
+          }
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          const parts = buffer.split('\n');
+
+          try {
+            if (parts.length > 1) {
+              data = JSON.parse(parts[parts.length - 2])?.data || [];
+            }
+          } catch (err) {
+            console.error('Error parsing JSON:', err);
+            data = [];
+          }
+
+          buffer = parts[parts.length - 1] || '';
+          
+          if (Array.isArray(data)) {
+            updateTables(data);
+            updateTableDetections(data);
+            if (document.URL.includes("old_layout")) { // hacky and not good practice. will refactor in the future.
+              updateBBoxes(data);
+            }
+          }
+          
+          processStream();
+        } catch (error) {
+          console.error('Error in processStream:', error);
+          setTimeout(() => fetchDetections(), 2000);
+        }
+      }).catch(error => {
+        console.error('Error reading stream:', error);
+        setTimeout(() => fetchDetections(), 2000);
+      });
+    };
+
+    processStream();
+  }).catch(error => {
+    console.error('Error fetching detections:', error);
+    setTimeout(() => fetchDetections(), 5000);
+  });
+};
+
+const getTable = (name) => {
+  if (!namelistJSON || !namelistJSON.details) return null;
+  
+  const person = namelistJSON.details.find(detail => {
+    // Match by name (case-insensitive, partial match)
+    return detail.name.toLowerCase().includes(name.toLowerCase()) || 
+           name.toLowerCase().includes(detail.name.toLowerCase());
+  });
+  
+  if (person && person.table) {
+    return person.table
+  }
+  
+  return null;
+};
+
+const updateTable = (tableName) => {
+  if (tableName == null) {
+    return
+  }
+  const tables = JSON.parse(localStorage.getItem("tables"))
+  const id = tables.find(table => {
+    return table.label === tableName
+  }).id
+
+  const tableEl = document.getElementById(id)
+  if (tableEl !== null) {
+    tableEl.classList.add("highlighted");
+  }
+}
+
+const resetTables = () => {
+  const tables = JSON.parse(localStorage.getItem("tables"))
+  tables.forEach(table => {
+    const tableEl = document.getElementById(table.id)
+    if ( tableEl !== null && tableEl.classList.contains("highlighted") ){
+      tableEl.classList.remove("highlighted");
+    }
+  })
+}
+
+const updateTables = (data) => {
+  const uniqueLabels = new Set();
+  resetTables()
+
+  // Process detections in order of detection (no sorting)
+  data.forEach((detection) => {
+    const unknown = detection.label === "UNKNOWN";
+
+    if (!unknown && !uniqueLabels.has(detection.label)) {
+      table = getTable(detection.label); // e.g. "T4"
+      if (table !== null) {
+        uniqueLabels.add(detection.label);
+      }
+    }
+
+    if (!unknown) {
+      // light up the table
+      updateTable(table)
+    }
+
+    if (!detection.bbox) return;
+  });
+};
+
+// table detection list functionality
+
+const detectionList = document.getElementById("table-detection-list")
+
+const updateTableDetections = (data) => {
+  let detections = []
+
+  data.forEach(detection => {
+    const name = detection.label.toUpperCase()
+    if (name == "UNKNOWN") {
+      return
+    }
+    const table = getTable(name)
+
+    let detectionEl = document.createElement('div')
+    detectionEl.classList.add('table-detection-element')
+    detectionEl.innerHTML = `${name} (${table})`
+
+    detections.push(detectionEl)
+  })
+
+  detections = sortTableDetections(detections)
+  detectionList.replaceChildren(...detections)
+}
+
+const sortTableDetections = (detectionList) => {
+  return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText))
+}
