@@ -37,16 +37,6 @@ class VideoPlayer:
         log_info("Video Player initialised!")
         pass
 
-    # def _print_error_notif(self) -> None:
-    #     if not self.in_error:
-    #         self.in_error = True
-    #         print("Error reading frame!!!")
-
-    # def _print_continue_notif(self) -> None:
-    #     if self.in_error:
-    #         self.in_error = False
-    #         print("Error resolved, continue ")
-
     def _handle_stream_end(self) -> None:
         log_info("ENDING FFMPEG SUBPROCESS")
         self.is_started = False
@@ -61,7 +51,7 @@ class VideoPlayer:
 
         command = [
             "ffmpeg",
-            "-rtsp_transport", "tcp", # Force TCP (for testing)
+            "-rtsp_transport", "udp", 
             "-i", stream_src.strip(),
             "-vsync", "0",
             "-copyts",
@@ -75,9 +65,10 @@ class VideoPlayer:
             "-fflags", "nobuffer",
             "-flags", "low_delay",
             "-tune", "zerolatency",
-            "-b:v", "500k",
-            "-buffer_size", "1000k",
-            "-",
+            # "-b:v", "2000k",
+            # "-buffer_size", "1G",
+            "-preset", "ultrafast",
+            "-"
         ]
 
         try:
@@ -85,6 +76,8 @@ class VideoPlayer:
         except Exception as e:
             log_info("An error occured:", e)
             self._handle_stream_end()
+
+        prev_frames_time = time.perf_counter()
 
         while not self.end_event.is_set():
             try:
@@ -100,14 +93,11 @@ class VideoPlayer:
                     self.end_event.set()
                     continue
 
-                # Convert the bytes read into a NumPy array, and reshape it to video frame dimensions
-                frame = np.frombuffer(raw_frame, np.uint8).reshape(
-                    (self.height, self.width, 3)
-                )
-                _, buffer = cv2.imencode(".jpg", frame)
+                buffer = raw_frame
 
                 with self.vid_lock:
-                    self.frame_bytes = buffer.tobytes()
+                    self.frame_bytes = buffer
+
             except Exception as e:
                 log_info(f"Error reading frame from FFmpeg: {e}")
                 log_info(traceback.format_exc())
@@ -148,7 +138,7 @@ class VideoPlayer:
         return None
     
     def end_stream(self) -> None:
-        """Ends ffmpeg video stream"""\
+        """Ends ffmpeg video stream"""
         
         self.end_event.set()
         
@@ -164,8 +154,12 @@ class VideoPlayer:
 
         while self.streamThread.is_alive():
             with self.vid_lock:
-                frame_bytes = self.frame_bytes
+                frame_bytes = np.frombuffer(self.frame_bytes, np.uint8).reshape(
+                    (self.height, self.width, 3)
+                )
+                _, buffer = cv2.imencode(".jpg", frame_bytes)
+
             yield (
                 b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
             )

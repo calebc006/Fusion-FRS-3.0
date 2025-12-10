@@ -53,6 +53,7 @@ body {
   .modal-content {
     max-width: 95vw;
     max-height: 95vh;
+    margin: 1em;
   }
 
   .modal-header {
@@ -64,7 +65,7 @@ body {
   }
 
   #video-container {
-    padding: 1em;
+    margin: 0;
   }
 }
 

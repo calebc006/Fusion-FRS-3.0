@@ -146,12 +146,13 @@ To conduct facial recognition, you need to load images of people you wish to be 
 
 1. From the `simpliFRy/data` folder (created automatically when starting the app), create a new directory with all the images of the people you wish to be detected.
 
-2. In the `simpliFRy/data` folder, create a JSON file named `namelist.json` that maps the image file name with the name of the person to be recognised. Format it as shown below:
+2. In the `simpliFRy/data` folder, create a JSON file named `namelist.json` (or whatever you want) that maps the image file name with the name of the person to be recognised. Format it as shown below:
 
 ```json
 // namelist.json
 {
   "img_folder_path": "path/to/image/folder",
+  "flag_folder_path": "path/to/flag/folder",
   "details": [
     {
       "name": "Person One",
@@ -170,7 +171,8 @@ To conduct facial recognition, you need to load images of people you wish to be 
 }
 ```
 
-`img_folder_path` will the path to the folder with all the faces **relative to `data`** (it need not be called `faces`).
+`img_folder_path` will the path to the folder with all the faces relative to `/data`
+`flag_folder_path` will the path to the folder with all the flags relative to `/data`
 
 
 For example, if `john_doe1.jpg` and `john_doe2.png` are pictures of 'John Doe' while `jane_smith.png` is a picture of 'Jane Smith', and all images are in a folder called `pictures`, this is the directory structure. 
@@ -179,6 +181,7 @@ For example, if `john_doe1.jpg` and `john_doe2.png` are pictures of 'John Doe' w
 simpliFRy/
 ├── data/
 |   ├── logs/
+|   ├── flags/
 |   ├── pictures/
 |   |   ├── john_doe1.jpg
 |   |   ├── john_doe2.png
@@ -192,6 +195,7 @@ simpliFRy/
 ```json
 {
   "img_folder_path": "pictures",
+  "flag_folder_path": "flags",
   "details": [
     {
       "name": "John Doe",
@@ -232,26 +236,6 @@ simpliFRy/
 
 Everytime the app is started, a new `.logs` file will be created. It will list key actions undertaken by the simpliFRy app in that session.
 
-### Software
-
-The app is hosted on `0.0.0.0`. Thus it is accessible by other computers in the same local area network using the network IP address of the hosting device.
-
-Running on port `1333`, the main web page is accessible when going the the URL <http://127.0.0.1:1333> on the browser (Microsoft Edge recommended). 
-
-![simpliFRy main page](assets/main_page.png)
-
-1. Fill in the **Video Stream Source** input with the URL to the RTSP stream. The format for RTSP URLs is `rtsp://[<username>:<password>@]<ip_address>:<rtsp_port>/[<endpoint>]`.
-
-  - Enclosed in angle brackets: variables to be replaced accordingly
-  - Enclosed in square brackets: optional
-
-Example RTSP URL `rtsp://admin:password123@192.168.1.42:4242/stream`
-
-2. Fill in the **Path to JSON file** input with the path the the JSON file that maps image file names to names of people to be recognised. The path <ins>must be relative to the `data` folder</ins>.
-
-**The JSON file need only be filled in the first time or whenever you would like to update the pictures or names, it can be left blank otherwise**
-
-3. Click on the 'Submit' button and wait a few seconds. The web page will then show the video stream (from the RTSP URL) with labelled bounding boxes drawn on it.
 
 ### Settings
 

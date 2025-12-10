@@ -1,4 +1,4 @@
-import io
+import time
 import json
 import os
 import threading
@@ -377,7 +377,7 @@ class FRVidPlayer(VideoPlayer):
         """
 
         try:
-            img = Image.open(io.BytesIO(frame_bytes)).convert("RGB")
+            img = Image.frombytes("RGB", (self.width, self.height), frame_bytes)
 
             width, height = img.size
             img = np.array(img)
@@ -494,6 +494,7 @@ class FRVidPlayer(VideoPlayer):
             try:
                 with self.inference_lock:
                     yield json.dumps({"data": self.fr_results}) + '\n'
+                    time.sleep(0.01) # cap FPS at 100
             except Exception as e:
                 log_info(f"Error in detection broadcast: {e}")
                 log_info(traceback.format_exc())

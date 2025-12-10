@@ -11,23 +11,16 @@ const videoContainer = document.getElementById("video-container");
 const closeVideoModal = document.getElementById("close-video-modal");
 const modalOverlay = document.querySelector(".modal-overlay");
 
-let isVideoVisible = localStorage.getItem("videoVisible") === "true";
-if (isVideoVisible) {
-  videoModal.classList.remove("hidden");
-} else {
-  videoModal.classList.add("hidden");
-}
+videoModal.classList.add("hidden");
 
 const showVideoModal = () => {
   videoModal.classList.remove("hidden");
   isVideoVisible = true
-  localStorage.setItem("videoVisible", "true");
 };
 
 const hideVideoModal = () => {
   videoModal.classList.add("hidden");
   isVideoVisible = false
-  localStorage.setItem("videoVisible", "false");
 };
 
 // Button to open video modal

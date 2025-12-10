@@ -79,6 +79,7 @@ const updateCountryFlag = (detectionName) => {
 const addDetectionEl = (name, description) => {
   const detectionEl = document.createElement("div");
   detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${description===null ? '' : `<p class="detectionDesc">${description}</p>`}`;
+  // detectionEl.innerHTML = `<p class="detectionName">${name}</p>`;
   detectionEl.classList.add("detectionEntry");
   
   detectionList.appendChild(detectionEl);
@@ -174,7 +175,8 @@ const fetchDetections = () => {
 
         buffer = parts[parts.length - 1];
         updateDetections(data);
-        if (streamCheck) processStream();
+
+        processStream()
       });
     };
 

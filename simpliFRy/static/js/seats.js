@@ -482,46 +482,38 @@ const fetchDetections = () => {
 
     const processStream = () => {
       reader.read().then(({ done, value }) => {
-        try {
-          if (done) {
-            console.log('Stream ended, reconnecting...');
-            setTimeout(() => fetchDetections(), 2000);
-            return;
-          }
-
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-
-          const parts = buffer.split('\n');
-
-          try {
-            if (parts.length > 1) {
-              data = JSON.parse(parts[parts.length - 2])?.data || [];
-            }
-          } catch (err) {
-            console.error('Error parsing JSON:', err);
-            data = [];
-          }
-
-          buffer = parts[parts.length - 1] || '';
-          
-          if (Array.isArray(data)) {
-            updateTables(data);
-            updateTableDetections(data);
-            if (document.URL.includes("old_layout")) { // hacky and not good practice. will refactor in the future.
-              updateBBoxes(data);
-            }
-          }
-          
-          processStream();
-        } catch (error) {
-          console.error('Error in processStream:', error);
+        if (done) {
+          console.log('Stream ended, reconnecting...');
           setTimeout(() => fetchDetections(), 2000);
+          return;
         }
-      }).catch(error => {
-        console.error('Error reading stream:', error);
-        setTimeout(() => fetchDetections(), 2000);
-      });
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const parts = buffer.split('\n');
+
+        try {
+          if (parts.length > 1) {
+            data = JSON.parse(parts[parts.length - 2])?.data || [];
+          }
+        } catch (err) {
+          console.error('Error parsing JSON:', err);
+          data = [];
+        }
+
+        buffer = parts[parts.length - 1] || '';
+        
+        if (Array.isArray(data)) {
+          updateTables(data);
+          updateTableDetections(data);
+          if (document.URL.includes("old_layout")) { // hacky and not good practice. will refactor in the future.
+            updateBBoxes(data);
+          }
+        }
+        
+        processStream();
+      })
     };
 
     processStream();
