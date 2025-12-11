@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import io
 import threading
 import traceback
 from datetime import datetime, timedelta
@@ -377,7 +378,7 @@ class FRVidPlayer(VideoPlayer):
         """
 
         try:
-            img = Image.frombytes("RGB", (self.width, self.height), frame_bytes)
+            img = Image.open(io.BytesIO(frame_bytes)).convert("RGB")
 
             width, height = img.size
             img = np.array(img)
@@ -494,7 +495,7 @@ class FRVidPlayer(VideoPlayer):
             try:
                 with self.inference_lock:
                     yield json.dumps({"data": self.fr_results}) + '\n'
-                    time.sleep(0.01) # cap FPS at 100
+                    # time.sleep(0.005) # cap FPS at 200
             except Exception as e:
                 log_info(f"Error in detection broadcast: {e}")
                 log_info(traceback.format_exc())

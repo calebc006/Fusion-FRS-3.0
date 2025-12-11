@@ -9,36 +9,6 @@ from flask_cors import CORS
 from fr import FRVidPlayer
 from utils import log_info
 
-parser = argparse.ArgumentParser(description="Facial Recognition Program")
-
-# Arguments
-parser.add_argument(
-    "-ip",
-    "--ipaddress",
-    type=str,
-    help="IP address to host the app from",
-    required=False,
-    default="0.0.0.0",
-)
-parser.add_argument(
-    "-p",
-    "--port",
-    type=str,
-    help="Port to host the app from",
-    required=False,
-    default="1333",
-)
-parser.add_argument(
-    "-v",
-    "--video",
-    type=str,
-    help="Enable the video feed (default true)",
-    required=False,
-    default="true",
-)
-
-args = parser.parse_args()
-
 app = Flask(__name__)
 CORS(app)
 
@@ -198,6 +168,36 @@ def settings():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Facial Recognition Program")
+
+    # Arguments
+    parser.add_argument(
+        "-ip",
+        "--ipaddress",
+        type=str,
+        help="IP address to host the app from",
+        required=False,
+        default="0.0.0.0",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=str,
+        help="Port to host the app from",
+        required=False,
+        default="1333",
+    )
+    parser.add_argument(
+        "-v",
+        "--video",
+        type=str,
+        help="Enable the video feed (default true)",
+        required=False,
+        default="true",
+    )
+
+    args = parser.parse_args()
+
     signal.signal(signal.SIGINT, fr_instance.cleanup)
     app.run(debug=True, host=args.ipaddress, port=args.port, use_reloader=False)
     
