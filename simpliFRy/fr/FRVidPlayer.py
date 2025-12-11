@@ -88,7 +88,7 @@ class FRVidPlayer(VideoPlayer):
 
         self.fr_settings: FRSettings = {
             "threshold": fr_settings.get("threshold", 0.45),
-            "holding_time": fr_settings.get("holding_time", 15),
+            "holding_time": fr_settings.get("holding_time", 3),
             "use_differentiator": fr_settings.get("use_differentiator", True),
             "threshold_lenient_diff": fr_settings.get("threshold_lenient_diff", 0.55),
             "similarity_gap": fr_settings.get("similarity_gap", 0.10),

@@ -8,3 +8,4 @@ taskbarPlaceholder.addEventListener("mouseenter", () => {
 taskbarPlaceholder.addEventListener("mouseleave", () => {
     taskbar.classList.remove("show")
 })
+

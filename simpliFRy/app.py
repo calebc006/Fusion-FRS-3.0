@@ -92,7 +92,7 @@ def fr_results():
     )
 
 
-@app.route("/submit", methods=["POST"])
+@app.route("/submit_settings", methods=["POST"])
 def submit():
     """Handles form submission to adjust FR settings, subsequently redirects to settings page"""
 
@@ -100,9 +100,9 @@ def submit():
         "threshold": float(request.form.get(
             "threshold", fr_instance.fr_settings["threshold"]
         )),
-        "holding_time": int(float(
+        "holding_time": float(
             request.form.get("holding_time", fr_instance.fr_settings["holding_time"]))
-        ),
+        ,
         "use_differentiator": "use_differentiator" in request.form,
         "threshold_lenient_diff": float(request.form.get(
             "threshold_lenient_diff", fr_instance.fr_settings["threshold_lenient_diff"]

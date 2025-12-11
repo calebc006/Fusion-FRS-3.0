@@ -1,47 +1,75 @@
-// video feed
+import { setBBoxPos, clearBBoxes, loadNamelistJSON, getTable } from "./utils.js";
 
-const videoFeed = document.getElementById("video-feed")
-videoFeed.setAttribute('data', '/vidFeed')
+const detectionList = document.getElementById("table-detection-list")
+let namelistJSON = undefined
 
-// bbox utils 
+window.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("video-feed").setAttribute('data', '/vidFeed')
+  let namelistPath = localStorage.getItem("namelistPath")
 
-const setBBoxPos = (bboxEl, bbox, width, height) => {
-  let ratiod_height = height, ratiod_width = width;
-  if ((height / width) > (9 / 16)) {
-    ratiod_height = width * 9 / 16;
-  } else {
-    ratiod_width = height * 16 / 9;
-  }
-
-  const left_offset = (width - ratiod_width) / 2;
-  const top_offset = (height - ratiod_height) / 2;
-
-  const org_left = bbox[0] * ratiod_width;
-  const org_top = bbox[1] * ratiod_height;
-  const org_width = (bbox[2] - bbox[0]) * ratiod_width;
-  const org_height = (bbox[3] - bbox[1]) * ratiod_height;
-
-  const width_truncate = Math.max(0, -org_left);
-  const height_truncate = Math.max(0, -org_top);
-
-  bboxEl.style.left = `${Math.max(left_offset, org_left + left_offset).toFixed(0) - 5}px`;
-  bboxEl.style.top = `${Math.max(top_offset, org_top + top_offset).toFixed(0) - 5}px`;
-  bboxEl.style.width = `${Math.min(org_width - width_truncate, ratiod_width - org_left).toFixed(0)}px`;
-  bboxEl.style.height = `${Math.min(org_height - height_truncate, ratiod_height - org_top).toFixed(0)}px`;
-};
-
-const clearBBoxes = () => {
-  const videoContainer = document.getElementById("video-container");
-  const prevBBoxes = videoContainer.querySelectorAll(".bbox");
-  prevBBoxes.forEach((element) => {
-    element.remove();
+  loadNamelistJSON(namelistPath).then((data)=> {
+    namelistJSON = data
+    fetchDetections()
   });
-  return videoContainer;
+});
+
+
+// MAIN LOOP
+const fetchDetections = () => {
+  console.log("FETCHING...");
+  let buffer = '';
+  let data = [];
+
+  fetch(`/frResults`).then(response => {
+    if (!response.ok || !response.body) {
+      console.error('Fetch failed, retrying...');
+      setTimeout(() => fetchDetections(), 5000);
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    const processStream = () => {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          console.log('Stream ended, reconnecting...');
+          setTimeout(() => fetchDetections(), 2000);
+          return;
+        }
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const parts = buffer.split('\n');
+
+        try {
+          if (parts.length > 1) {
+            data = JSON.parse(parts[parts.length - 2])?.data || [];
+          }
+        } catch (err) {
+          console.error('Error parsing JSON:', err);
+        }
+
+        buffer = parts[parts.length - 1] || '';
+        
+        updateBBoxes(data);
+        updateDetectionList(data)
+        processStream();
+      })
+    }
+
+    processStream();
+  }).catch(error => {
+    console.error('Error fetching detections:', error);
+    setTimeout(() => fetchDetections(), 5000);
+  });
 };
+
 
 const updateBBoxes = (data) => {
-  currData = [];
-  const videoContainer = clearBBoxes();
+  const videoContainer = document.getElementById("video-container");
+  clearBBoxes(videoContainer);
 
   // Process detections in order of detection (no sorting)
   data.forEach((detection) => {
@@ -64,9 +92,33 @@ const updateBBoxes = (data) => {
     // new UI with all blue boxes
     bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
 
-    currData.push(detection.bbox);
     setBBoxPos(bboxEl, detection.bbox, videoContainer.offsetWidth, videoContainer.offsetHeight);
     videoContainer.appendChild(bboxEl);
   });
 };
 
+
+const updateDetectionList = (data) => {
+  let detections = []
+
+  data.forEach(detection => {
+    const name = detection.label.toUpperCase()
+    if (name == "UNKNOWN") {
+      return
+    }
+    const table = getTable(name, namelistJSON)
+
+    let detectionEl = document.createElement('div')
+    detectionEl.classList.add('table-detection-element')
+    detectionEl.innerHTML = `${name} (${table})`
+
+    detections.push(detectionEl)
+  })
+
+  detections = sortDetections(detections)
+  detectionList.replaceChildren(...detections)
+}
+
+const sortDetections = (detectionList) => {
+  return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText))
+}
