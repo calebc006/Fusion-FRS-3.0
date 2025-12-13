@@ -10,7 +10,10 @@
     <link rel="stylesheet" href="../static/css/taskbar.css" />
     <link rel="stylesheet" href="../static/css/form.css" />
   </head>
-  <body class="bg-image" style="background-image: url('../static/welcome_bg.png')">
+  <body
+    class="bg-image"
+    style="background-image: url('../static/welcome_bg.png')"
+  >
     <!-- Logos -->
     <div class="flex-container-logo">
       <img class="logo" src="../static/armylogo.png" />
@@ -21,7 +24,12 @@
     <!-- Contains flags and detections -->
     <div id="main-container">
       <div id="country-flag-container" class="country-flag-container">
-        <img id="country-flag-img" src="" alt="Country Flag" style="display: none;" />
+        <img
+          id="country-flag-img"
+          src=""
+          alt="Country Flag"
+          style="display: none"
+        />
       </div>
       <div class="detection-list-container">
         <div class="detections" id="detections-list"></div>
@@ -55,16 +63,39 @@
     <!-- Initialisation form -->
     <form id="init" class="form">
       <label for="stream_src_select">Video Stream Source</label>
-        <select id="stream_src_select" class="init-input" name="stream_src" required>
-          <option value="rtsp://admin:CV@hikvision@192.168.1.65">192.168.1.65</option>
-          <option value="rtsp://admin:CV@hikvision@192.168.1.66">192.168.1.66</option>
-          <option value="rtsp://admin:CV@hikvision@192.168.1.67">192.168.1.67</option>
-          <option value="rtsp://admin:CV@hikvision@192.168.1.68">192.168.1.68</option>
-          <option value="rtsp://admin:CV@hikvision@192.168.1.69">192.168.1.69</option>
-          <option value="rtsp://admin:CV@hikvision@192.168.1.70">192.168.1.70</option>
-          <option value="custom">Custom</option>
-        </select>
-      <input type="url" id="stream_src_custom" class="init-input" style="display:none;" placeholder="Enter custom RTSP URL" />
+      <select
+        id="stream_src_select"
+        class="init-input"
+        name="stream_src"
+        required
+      >
+        <option value="rtsp://admin:CV@hikvision@192.168.1.65">
+          192.168.1.65
+        </option>
+        <option value="rtsp://admin:CV@hikvision@192.168.1.66">
+          192.168.1.66
+        </option>
+        <option value="rtsp://admin:CV@hikvision@192.168.1.67">
+          192.168.1.67
+        </option>
+        <option value="rtsp://admin:CV@hikvision@192.168.1.68">
+          192.168.1.68
+        </option>
+        <option value="rtsp://admin:CV@hikvision@192.168.1.69">
+          192.168.1.69
+        </option>
+        <option value="rtsp://admin:CV@hikvision@192.168.1.70">
+          192.168.1.70
+        </option>
+        <option value="custom">Custom</option>
+      </select>
+      <input
+        type="url"
+        id="stream_src_custom"
+        class="init-input"
+        style="display: none"
+        placeholder="Enter custom RTSP URL"
+      />
 
       <div class="break"></div>
       <label for="data_file">Path to JSON file</label>
@@ -78,7 +109,7 @@
         value="Submit"
       />
     </form>
-    
+
     <script type="module" src="../static/js/index.js"></script>
     <script type="module" src="../static/js/taskbar.js"></script>
   </body>

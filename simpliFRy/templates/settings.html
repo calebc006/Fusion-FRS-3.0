@@ -24,7 +24,8 @@
           max="0.9"
           step="0.01"
           required
-        /><div class="break"></div>
+        />
+        <div class="break"></div>
         <!-- Value below which a face would be considered recognised; the lower the stricter -->
 
         <label for="holding_time">Holding Time</label>
@@ -49,8 +50,14 @@
           type="checkbox"
           id="use_differentiator"
           name="use_differentiator"
-          {% if use_differentiator %}checked{% endif %}
-        /><div class="break"></div>
+          {%
+          if
+          use_differentiator
+          %}checked{%
+          endif
+          %}
+        />
+        <div class="break"></div>
 
         <label for="threshold_lenient_diff">Lenient Threshold</label>
         <input
@@ -63,7 +70,8 @@
           max="0.9"
           step="0.01"
           required
-        /><div class="break"></div>
+        />
+        <div class="break"></div>
         <!-- Value below which a face would be considered recognised; the lower the stricter; lenient threshold is for faces where the top match is much closer than the 2nd best -->
 
         <label for="similarity_gap">Similarity Gap</label>
@@ -89,8 +97,14 @@
           type="checkbox"
           id="use_persistor"
           name="use_persistor"
-          {% if use_persistor %}checked{% endif %}
-        /><div class="break"></div>
+          {%
+          if
+          use_persistor
+          %}checked{%
+          endif
+          %}
+        />
+        <div class="break"></div>
 
         <label for="threshold_prev">Persistor Threshold</label>
         <input
@@ -102,7 +116,8 @@
           min="0.01"
           max="0.6"
           step="0.01"
-        /><div class="break"></div>
+        />
+        <div class="break"></div>
         <!-- The lower the stricter; persistor threshold is used to compare faces with previously identified faces (within holding time) -->
 
         <label for="threshold_iou">IOU Threshold</label>
@@ -115,9 +130,9 @@
           min="0.00"
           max="1.00"
           step="0.01"
-        /><div class="break"></div>
+        />
+        <div class="break"></div>
         <!-- The higher the stricter; When comparing with previously identified faces, the bounding boxes must overlap with their intersected area at least a fraction of their union area -->
-
 
         <label for="threshold_lenient_pers">Lenient Threshold</label>
         <input
@@ -131,7 +146,6 @@
           step="0.01"
         />
         <!-- The lower the stricter; This is a safeguard ensuring that faces fulfilling the above 2 criterias are not completely random but bear some recognition to faces in the database -->
-
       </fieldset>
 
       <input type="submit" class="submit-button" value="Submit" />
