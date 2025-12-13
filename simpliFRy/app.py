@@ -9,36 +9,6 @@ from flask_cors import CORS
 from fr import FRVidPlayer
 from utils import log_info
 
-parser = argparse.ArgumentParser(description="Facial Recognition Program")
-
-# Arguments
-parser.add_argument(
-    "-ip",
-    "--ipaddress",
-    type=str,
-    help="IP address to host the app from",
-    required=False,
-    default="0.0.0.0",
-)
-parser.add_argument(
-    "-p",
-    "--port",
-    type=str,
-    help="Port to host the app from",
-    required=False,
-    default="1333",
-)
-parser.add_argument(
-    "-v",
-    "--video",
-    type=str,
-    help="Enable the video feed (default true)",
-    required=False,
-    default="true",
-)
-
-args = parser.parse_args()
-
 app = Flask(__name__)
 CORS(app)
 
@@ -122,7 +92,7 @@ def fr_results():
     )
 
 
-@app.route("/submit", methods=["POST"])
+@app.route("/submit_settings", methods=["POST"])
 def submit():
     """Handles form submission to adjust FR settings, subsequently redirects to settings page"""
 
@@ -130,9 +100,9 @@ def submit():
         "threshold": float(request.form.get(
             "threshold", fr_instance.fr_settings["threshold"]
         )),
-        "holding_time": int(float(
+        "holding_time": float(
             request.form.get("holding_time", fr_instance.fr_settings["holding_time"]))
-        ),
+        ,
         "use_differentiator": "use_differentiator" in request.form,
         "threshold_lenient_diff": float(request.form.get(
             "threshold_lenient_diff", fr_instance.fr_settings["threshold_lenient_diff"]
@@ -198,6 +168,36 @@ def settings():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Facial Recognition Program")
+
+    # Arguments
+    parser.add_argument(
+        "-ip",
+        "--ipaddress",
+        type=str,
+        help="IP address to host the app from",
+        required=False,
+        default="0.0.0.0",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=str,
+        help="Port to host the app from",
+        required=False,
+        default="1333",
+    )
+    parser.add_argument(
+        "-v",
+        "--video",
+        type=str,
+        help="Enable the video feed (default true)",
+        required=False,
+        default="true",
+    )
+
+    args = parser.parse_args()
+
     signal.signal(signal.SIGINT, fr_instance.cleanup)
     app.run(debug=True, host=args.ipaddress, port=args.port, use_reloader=False)
     

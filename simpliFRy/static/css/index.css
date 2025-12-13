@@ -106,7 +106,6 @@
 
 #video-container {
   position: relative;
-  padding: 1.5em;
   display: flex;
   align-items: center;
   justify-content: center;

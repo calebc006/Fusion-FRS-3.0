@@ -1,7 +1,6 @@
 import subprocess
 import threading
 import time
-import traceback
 from typing import Generator
 
 import cv2
@@ -61,7 +60,7 @@ class VideoPlayer:
 
         command = [
             "ffmpeg",
-            "-rtsp_transport", "tcp", # Force TCP (for testing)
+            "-rtsp_transport", "tcp", 
             "-i", stream_src.strip(),
             "-vsync", "0",
             "-copyts",
@@ -87,32 +86,22 @@ class VideoPlayer:
             self._handle_stream_end()
 
         while not self.end_event.is_set():
-            try:
-                # Read width*height*3 bytes from stdout (1 frame)
-                raw_frame = ffmpeg_process.stdout.read(self.width * self.height * 3)
+            # Read width*height*3 bytes from stdout (1 frame)
+            raw_frame = ffmpeg_process.stdout.read(self.width * self.height * 3)
 
-                # If error or EOF, ends ffmpeg subprocess
-                if len(raw_frame) != (self.width * self.height * 3):
-                    if len(raw_frame) == 0:
-                        log_info("FFmpeg stream ended (EOF)")
-                    else:
-                        log_info(f"FFmpeg frame size mismatch: expected {self.width * self.height * 3}, got {len(raw_frame)}")
-                    self.end_event.set()
-                    continue
-
-                # Convert the bytes read into a NumPy array, and reshape it to video frame dimensions
-                frame = np.frombuffer(raw_frame, np.uint8).reshape(
-                    (self.height, self.width, 3)
-                )
-                _, buffer = cv2.imencode(".jpg", frame)
-
-                with self.vid_lock:
-                    self.frame_bytes = buffer.tobytes()
-            except Exception as e:
-                log_info(f"Error reading frame from FFmpeg: {e}")
-                log_info(traceback.format_exc())
+            # If error, ends ffmpeg subprocess
+            if len(raw_frame) != (self.width * self.height * 3):
                 self.end_event.set()
                 continue
+
+            # Convert the bytes read into a NumPy array, and reshape it to video frame dimensions
+            frame = np.frombuffer(raw_frame, np.uint8).reshape(
+                (self.height, self.width, 3)
+            )
+            _, buffer = cv2.imencode(".jpg", frame)
+
+            with self.vid_lock:
+                self.frame_bytes = buffer.tobytes()
 
         else:
             self._handle_stream_end()
