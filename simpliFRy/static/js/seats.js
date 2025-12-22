@@ -554,8 +554,12 @@ const updateTable = (tableName) => {
     const tables = JSON.parse(localStorage.getItem("tables"));
     const id = tables.find((table) => {
         return table.label === tableName;
-    }).id;
+    })?.id;
 
+    if (id == null) {
+        return;
+    }
+    
     const tableEl = document.getElementById(id);
     if (tableEl !== null) {
         tableEl.classList.add("highlighted");

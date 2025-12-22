@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import signal
+import time
 
 from flask import Flask, Response, render_template, request, redirect, url_for, send_from_directory
 from flask_cors import CORS
@@ -29,6 +30,14 @@ def start():
     data_file = request.form.get("data_file", None)
 
     fr_instance.start_stream(stream_src)
+    
+    # Give the stream thread a moment to start and check if it's still alive
+    time.sleep(1.5)
+    if not fr_instance.streamThread.is_alive():
+        log_info("Stream thread died immediately after starting")
+        fr_instance.end_event.set()
+        response_msg = json.dumps({"stream": False, "message": "Failed to start video stream. Check logs for details."})
+        return Response(response_msg, status=200, mimetype='application/json')
 
     try:
         fr_instance.load_embeddings(data_file)

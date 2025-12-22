@@ -355,7 +355,7 @@ const openVideoModalButton = document.getElementById("open-video-modal-button");
 if (openVideoModalButton) {
     openVideoModalButton.addEventListener("click", () => {
         const videoFeed = document.getElementById("video-feed");
-        videoFeed.setAttribute("data", "/vidFeed");
+        videoFeed.setAttribute("data", `/vidFeed?t=${Date.now()}`);
 
         showVideoModal();
     });
