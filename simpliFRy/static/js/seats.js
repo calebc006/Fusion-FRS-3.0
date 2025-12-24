@@ -1,22 +1,20 @@
+import {
+    setBBoxPos,
+    clearBBoxes,
+    loadNamelistJSON,
+    getTable,
+} from "./utils.js";
+
 let namelistJSON = null;
 
-const loadNamelistJSON = async () => {
-    try {
-        const response = await fetch("/data/namelist.json");
-        if (response.ok) {
-            namelistJSON = await response.json();
-        } else {
-            console.warn("Could not load namelist.json");
-        }
-    } catch (error) {
-        console.error("Error loading namelist.json:", error);
-    }
-};
 
 window.addEventListener("DOMContentLoaded", () => {
     makeMenuDraggable("table-menu", "table-menu-header");
     loadTablesFromStorage();
-    loadNamelistJSON().then(() => {
+
+    let namelistPath = localStorage.getItem("namelistPath");
+    loadNamelistJSON(namelistPath).then((data) => {
+        namelistJSON = data;
         fetchDetections();
     });
 
@@ -549,24 +547,6 @@ const fetchDetections = () => {
         });
 };
 
-const getTable = (name) => {
-    if (!namelistJSON || !namelistJSON.details) return null;
-
-    const person = namelistJSON.details.find((detail) => {
-        // Match by name (case-insensitive, partial match)
-        return (
-            detail.name.toLowerCase().includes(name.toLowerCase()) ||
-            name.toLowerCase().includes(detail.name.toLowerCase())
-        );
-    });
-
-    if (person && person.table) {
-        return person.table;
-    }
-
-    return null;
-};
-
 const updateTable = (tableName) => {
     if (tableName == null) {
         return;
@@ -574,8 +554,12 @@ const updateTable = (tableName) => {
     const tables = JSON.parse(localStorage.getItem("tables"));
     const id = tables.find((table) => {
         return table.label === tableName;
-    }).id;
+    })?.id;
 
+    if (id == null) {
+        return;
+    }
+    
     const tableEl = document.getElementById(id);
     if (tableEl !== null) {
         tableEl.classList.add("highlighted");
@@ -599,17 +583,16 @@ const updateTables = (data) => {
     // Process detections in order of detection (no sorting)
     data.forEach((detection) => {
         const unknown = detection.label === "UNKNOWN";
+        let table = null;
 
         if (!unknown && !uniqueLabels.has(detection.label)) {
-            table = getTable(detection.label); // e.g. "T4"
+            table = getTable(detection.label, namelistJSON); // e.g. "T4"
             if (table !== null) {
                 uniqueLabels.add(detection.label);
-            }
-        }
 
-        if (!unknown) {
-            // light up the table
-            updateTable(table);
+                // light up the table
+                updateTable(table);
+            }
         }
 
         if (!detection.bbox) return;
@@ -628,7 +611,7 @@ const updateTableDetections = (data) => {
         if (name == "UNKNOWN") {
             return;
         }
-        const table = getTable(name);
+        const table = getTable(name, namelistJSON);
 
         let detectionEl = document.createElement("div");
         detectionEl.classList.add("table-detection-element");

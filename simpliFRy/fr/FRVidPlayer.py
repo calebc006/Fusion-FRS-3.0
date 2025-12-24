@@ -378,6 +378,9 @@ class FRVidPlayer(VideoPlayer):
         """
 
         try:
+            if not frame_bytes:
+                return [{"label": "Unknown"}]
+
             img = Image.open(io.BytesIO(frame_bytes)).convert("RGB")
 
             width, height = img.size

@@ -9,7 +9,7 @@ const detectionList = document.getElementById("table-detection-list");
 let namelistJSON = undefined;
 
 window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("video-feed").setAttribute("data", "/vidFeed");
+    document.getElementById("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
     let namelistPath = localStorage.getItem("namelistPath");
 
     loadNamelistJSON(namelistPath).then((data) => {

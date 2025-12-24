@@ -10,8 +10,6 @@ services:
     deploy:
       resources:
         reservations:
-          cpus: '30'
-          memory: 32G
           devices:
             - driver: nvidia
               count: all
