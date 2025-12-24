@@ -32,7 +32,7 @@ def start():
     fr_instance.start_stream(stream_src)
     
     # Give the stream thread a moment to start and check if it's still alive
-    time.sleep(1.5)
+    time.sleep(0.3)  # Reduced from 1.5s for faster startup
     if not fr_instance.streamThread.is_alive():
         log_info("Stream thread died immediately after starting")
         fr_instance.end_event.set()

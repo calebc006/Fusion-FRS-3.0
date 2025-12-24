@@ -366,21 +366,26 @@ document
     .getElementById("end_stream_button")
     .addEventListener("click", async (event) => {
         event.preventDefault();
-        endDetections();
-        document.getElementById("video-feed").removeAttribute("data");
 
+        endDetections();
+        console.log("Detections Ended")
+        
+        document.getElementById("video-feed").removeAttribute("data");
+        console.log("Video Feed Down")
+        
         fetch("/end", {
             method: "POST",
         })
-            .then((response) => response.json())
-            .then((_data) => {
-                document.getElementById("main-container").style.display =
-                    "none";
-                document.getElementById("init").style.display = "flex";
-            })
-            .catch((error) => {
-                console.log(error);
-            });
+        .then((response) => response.json())
+        .then((_data) => {
+            document.getElementById("main-container").style.display =
+            "none";
+            document.getElementById("init").style.display = "flex";
+            console.log("Reset to init form")
+        })
+        .catch((error) => {
+            console.log(error);
+        });
 
         location.reload();
     });
