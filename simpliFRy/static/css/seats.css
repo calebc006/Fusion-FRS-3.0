@@ -13,9 +13,9 @@
     top: 0;
     left: 0;
     pointer-events: none; /* optional, lets clicks pass through */
-    z-index: 999; 
+    z-index: 999;
 }
-  
+
 .box {
     width: 160px;
     height: 160px;
@@ -29,7 +29,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     position: absolute; /* Allows free positioning */
     cursor: grab;
-    user-select: none;  /* Prevents text selection while dragging */
+    user-select: none; /* Prevents text selection while dragging */
 }
 
 #table-menu {
@@ -43,10 +43,10 @@
     border-radius: 8px;
     width: 220px;
     z-index: 2000;
-    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
     user-select: none;
 }
-  
+
 #table-menu .menu-header {
     cursor: move;
     display: flex;
@@ -57,7 +57,7 @@
     font-weight: bold;
     margin-bottom: 10px;
 }
-  
+
 #table-menu button {
     background-color: #2a2a2a;
     color: white;
@@ -68,11 +68,11 @@
     border-radius: 4px;
     cursor: pointer;
 }
-  
+
 #table-menu button:hover {
     background-color: #3a3a3a;
 }
-  
+
 #table-menu .lock-toggle {
     margin-top: 10px;
     font-size: 14px;
@@ -86,8 +86,8 @@
     margin: 10px 0;
     font-size: 14px;
     color: white;
-  }
-  
+}
+
 .menu-option input[type="checkbox"] {
     margin-right: 6px;
     transform: scale(1.2);
@@ -104,83 +104,87 @@
     height: 100%;
     outline: none;
 }
-  
+
 .rename-input:focus {
-background-color: rgba(0, 0, 0, 0.5);  /* Optional: Add a background color when focused */
+    background-color: rgba(
+        0,
+        0,
+        0,
+        0.5
+    ); /* Optional: Add a background color when focused */
 }
 
 .resize-slider-wrapper {
-  position: absolute;
-  bottom: -28px;
-  left: 0;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
+    position: absolute;
+    bottom: -28px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
 }
 
 .resize-slider {
-  width: 70%;
-  display: none;
+    width: 70%;
+    display: none;
 }
 
 .slider-label {
-  font-weight: bold;
+    font-weight: bold;
 }
 
 .box {
-  position: absolute;
-  transition: box-shadow 0.2s ease;
+    position: absolute;
+    transition: box-shadow 0.2s ease;
 }
 
 .delete-btn {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  background: rgba(255, 50, 50, 0.8);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  font-size: 14px;
-  cursor: pointer;
-  display: none;
-  z-index: 10;
-  display: none;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(255, 50, 50, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    display: none;
+    z-index: 10;
+    display: none;
 }
 
-
 .highlighted {
-  border: solid gold 15px;
-  box-sizing: border-box;
-  background-color: gold;
+    border: solid gold 15px;
+    box-sizing: border-box;
+    background-color: gold;
 }
 
 .highlighted .box-label {
-  color:  gold;
-  font-size: 30px;
+    color: gold;
+    font-size: 30px;
 }
 
 .slider-label {
-  color: black;
-  display: none;
+    color: black;
+    display: none;
 }
 
 .table-detection-list {
-  position: absolute;
-  top: 25vh;
-  left: 60vw;
-  width: 30vw;
-  padding-left: 10px;
-  padding-right: 10px;
+    position: absolute;
+    top: 25vh;
+    left: 60vw;
+    width: 30vw;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 .table-detection-element {
-  font-size: 40px;
-  font-family: Helvetica, sans-serif;
-  color: black;
-  margin-bottom: 10px;
+    font-size: 40px;
+    font-family: Helvetica, sans-serif;
+    color: black;
+    margin-bottom: 10px;
 }

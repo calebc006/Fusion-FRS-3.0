@@ -6,21 +6,20 @@
 
 #video-feed {
     width: 52vw;
-
 }
 
 .table-detection-list {
-  position: absolute;
-  top: 30vh;
-  left: 60vw;
-  width: 30vw;
-  padding-left: 10px;
-  padding-right: 10px;
+    position: absolute;
+    top: 30vh;
+    left: 60vw;
+    width: 30vw;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 .table-detection-element {
-  font-size: 40px;
-  font-family: Helvetica, sans-serif;
-  color: black;
-  margin-bottom: 10px;
+    font-size: 40px;
+    font-family: Helvetica, sans-serif;
+    color: black;
+    margin-bottom: 10px;
 }

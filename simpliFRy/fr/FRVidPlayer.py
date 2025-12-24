@@ -466,9 +466,6 @@ class FRVidPlayer(VideoPlayer):
                 results = self.infer(frame_bytes)
                 with self.inference_lock:
                     self.fr_results = results
-            except AttributeError as e:
-                log_info(f"Error in inference loop: {e}")
-                continue
             except Exception as e:
                 log_info(f"Error in inference loop: {e}")
                 log_info(traceback.format_exc())
