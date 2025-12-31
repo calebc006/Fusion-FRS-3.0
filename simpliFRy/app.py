@@ -9,6 +9,8 @@ from flask_cors import CORS
 
 from fr import FRVidPlayer
 from utils import log_info
+from types import SimpleNamespace
+import atexit
 
 app = Flask(__name__)
 CORS(app)
@@ -16,6 +18,24 @@ CORS(app)
 log_info("Starting FR Session")
 
 fr_instance = FRVidPlayer()
+
+
+# Load runtime configuration from environment by default. If the script
+# is executed as __main__ we will override these with argparse values.
+def _default_config_from_env():
+    return SimpleNamespace(
+        ipaddress=os.getenv("APP_IP", "0.0.0.0"),
+        port=int(os.getenv("APP_PORT", "1333")),
+        video=os.getenv("APP_VIDEO", "true").lower(),
+        env=os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development")).lower(),
+    )
+
+
+# module-level config used by routes (so imported by WSGI servers works)
+config = _default_config_from_env()
+
+# Ensure cleanup runs when the process exits, even if this module is imported
+atexit.register(fr_instance.cleanup)
 
 
 @app.route("/start", methods=["POST"])
@@ -82,7 +102,7 @@ def check_alive():
 @app.route("/vidFeed")
 def video_feed():
     """Returns a HTTP streaming response of the video feed from FFMPEG"""
-    vid_enabled = args.video == "true"
+    vid_enabled = config.video == "true"
 
     if vid_enabled:
         return Response(
@@ -179,34 +199,70 @@ def settings():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Facial Recognition Program")
 
-    # Arguments
+    # Arguments (these override environment variables when provided)
     parser.add_argument(
         "-ip",
         "--ipaddress",
         type=str,
         help="IP address to host the app from",
         required=False,
-        default="0.0.0.0",
     )
     parser.add_argument(
         "-p",
         "--port",
-        type=str,
+        type=int,
         help="Port to host the app from",
         required=False,
-        default="1333",
     )
     parser.add_argument(
         "-v",
         "--video",
         type=str,
-        help="Enable the video feed (default true)",
+        help="Enable the video feed (true/false)",
         required=False,
-        default="true",
+    )
+    parser.add_argument(
+        "--env",
+        type=str,
+        choices=["development", "production"],
+        help="Run environment (development or production). Can also be set via APP_ENV/FLASK_ENV.",
+        required=False,
+    )
+    parser.add_argument(
+        "--prod",
+        action="store_true",
+        help="Shortcut to set --env production (kept for backwards compatibility)",
+        required=False,
     )
 
     args = parser.parse_args()
 
+    # Override module-level config with parsed args when provided
+    if args.ipaddress:
+        config.ipaddress = args.ipaddress
+    if args.port:
+        config.port = args.port
+    if args.video:
+        config.video = args.video.lower()
+    if args.env:
+        config.env = args.env.lower()
+    if args.prod:
+        config.env = "production"
+
     signal.signal(signal.SIGINT, fr_instance.cleanup)
-    app.run(debug=True, host=args.ipaddress, port=args.port, use_reloader=False)
+    atexit.register(fr_instance.cleanup)
+
+    # If running in production, prefer waitress. Otherwise use Flask dev server.
+    if config.env == "production":
+        try:
+            from waitress import serve
+
+            log_info(f"Starting in production (waitress) on {config.ipaddress}:{config.port}")
+            serve(app, host=config.ipaddress, port=config.port)
+        except Exception as e:
+            log_info(f"waitress unavailable or failed ({e}). Falling back to Flask server.")
+            app.run(debug=False, host=config.ipaddress, port=config.port, use_reloader=False)
+    else:
+        log_info(f"Starting in development mode on {config.ipaddress}:{config.port}")
+        app.run(debug=True, host=config.ipaddress, port=config.port, use_reloader=False)
     

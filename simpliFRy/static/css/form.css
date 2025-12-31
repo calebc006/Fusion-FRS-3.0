@@ -14,19 +14,19 @@
     background-color: rgb(47, 79, 79);
     border-radius: 1em;
     border-width: 0;
-    color: var(--color-foreground)
+    color: var(--color-foreground);
 }
 
 .submit-button:hover {
     background-color: rgb(35, 65, 65);
-    cursor:pointer;
+    cursor: pointer;
 }
 
 input {
     padding: 0.3em;
     border-radius: 0.5em;
     border-width: 0;
-    background-color: rgb(50,50,50);
+    background-color: rgb(50, 50, 50);
     color: var(--color-foreground);
     opacity: 0.5;
 }
@@ -50,7 +50,7 @@ input:hover {
 }
 
 .break {
-    height:1.5em
+    height: 1.5em;
 }
 
 .hidden {
@@ -61,16 +61,18 @@ input:hover {
     visibility: hidden;
 }
 
-
-  
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
-  
+
 .animate-pulse {
     animation: pulse 2s infinite;
 }
-  
-
