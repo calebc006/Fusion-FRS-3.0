@@ -48,6 +48,14 @@
   background-color: rgba(19, 84, 206, 0.5);
 }
 
+#home-button {
+  background-color: rgb(5, 145, 17);
+}
+
+#home-button:hover {
+  background-color: rgb(0, 121, 10);
+}
+
 .taskbar.show {
   visibility: visible;
   transform: translateY(0%);

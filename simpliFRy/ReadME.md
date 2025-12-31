@@ -21,24 +21,6 @@ If you are a developer and would like to understand more about how simpliFRy wor
 
 ---
 
-## Features
-
-### Cutting out the need for 3rd Party Softwares.
-
-Previous iterations of Fusion's Facial Recognition System reads the live video feed through _Video Capture Devices_. These include Webcams, USB Capture Devices and OBS Virtual Camera. However, most of the cameras used in conjunction with the FRS transmit their feed via _Real-Time Streaming Protocol_ (RTSP) through ethernet cables. To access the feed, 3rd party softwares such as OBS Studio and VLC Media Player are used to broadcast the RTSP stream in a Virtual Camera.
-
-As OBS Studio only broadcasts one instance of virtual camera at a time, this limits the number of camera feed a computer, no matter how computationally powerful, can access to one. As a result, multiple computers have to be used whenever multiple cameras are used, which they often are (in a bid to cover more angles for facial recognition).
-
-The use of **FFmpeg** in simpliFRy to read the the RTSP stream directly solves this issue by bypassing the need for OBS Studio. Now, a sufficiently powerful computer is able to simultaneously run facial recognition on at least 2 video feeds at once (subject to quality of ethernet cable), maximising the use of hardware resources.
-
-Incidentally, removing the need for 3rd party softwares, not only simplifies the installation process (as you only need to install this software), but also reduces the complexity of operating the program, hence making it easier even for non-technologically inclined persons to learn and remember.
-
-### [Enhanced Detection Algorithm](Developer%20Guide.md#enhanced-detection-algorithm)
-
-### [Microservice Design](Developer%20Guide.md#microservice-design)
-
----
-
 ## Installation
 
 ### Prerequisites
@@ -116,9 +98,7 @@ Alternatively, you can run docker compose from the `simpliFRy` directory
 docker compose up --no-build
 ```
 
-Access the web UI at <http://127.0.0.1:1333> (preferably using Microsoft Edge)
-
-The port argument `1333:1333` can be changed according to what you require, if you want to run at port 2000 instead, use `2000:1333` instead.
+Access the web UI at <http://127.0.0.1:1333> (preferably using a Chromium browser)
 
 If you want to run multiple containers, run one container at with the port argument `1333:1333` (port 1333) and another with the argument `2000:1333` (this means port 2000, you can use another port number).
 
@@ -130,9 +110,9 @@ Alternatively, you can edit `docker-compose.yml` and run
 docker compose up --no-build
 ```
 
-If you do have an existing container, you can start it from the Docker Desktop application
+If you already have an existing container, you can simply start it from the Docker Desktop application.
 
-### Without Docker (for development only)
+### Without Docker (for development)
 
 Run the `app.py` script in the simpliFRy virtual environment
 
@@ -146,10 +126,10 @@ To conduct facial recognition, you need to load images of people you wish to be 
 
 1. From the `simpliFRy/data` folder (created automatically when starting the app), create a new directory with all the images of the people you wish to be detected.
 
-2. In the `simpliFRy/data` folder, create a JSON file named `namelist.json` (or whatever you want) that maps the image file name with the name of the person to be recognised. Format it as shown below:
+2. In the `simpliFRy/data` folder, create a JSON file (name it whatever you want) that maps the image file name with the name of the person to be recognised. Format it as shown below:
 
 ```json
-// namelist.json
+// example.json
 {
   "img_folder_path": "path/to/image/folder",
   "flag_folder_path": "path/to/flag/folder",
@@ -157,12 +137,14 @@ To conduct facial recognition, you need to load images of people you wish to be 
     {
       "name": "Person One",
       "images": ["image1.jpg", "image2.png"],
+      "country_flag": "singapore_flag.png",
       "description": "Chief of Army, Redland Armed Forces",
       "table": "T1"
     },
     {
       "name": "Person Two",
       "images": ["image3.jpg", "image4.png"],
+      "country_flag": "brunei_flag.png",
       "description": "Janitor",
       "table": "T2"
     }
@@ -172,7 +154,7 @@ To conduct facial recognition, you need to load images of people you wish to be 
 ```
 
 `img_folder_path` will the path to the folder with all the faces relative to `/data`
-`flag_folder_path` will the path to the folder with all the flags relative to `/data`
+`flag_folder_path` will the path to the folder with all the country flags relative to `/data`
 
 
 For example, if `john_doe1.jpg` and `john_doe2.png` are pictures of 'John Doe' while `jane_smith.png` is a picture of 'Jane Smith', and all images are in a folder called `pictures`, this is the directory structure. 
@@ -182,6 +164,7 @@ simpliFRy/
 ├── data/
 |   ├── logs/
 |   ├── flags/
+|   |   ├── singapore_flag.png
 |   ├── pictures/
 |   |   ├── john_doe1.jpg
 |   |   ├── john_doe2.png
@@ -200,41 +183,36 @@ simpliFRy/
     {
       "name": "John Doe",
       "images": ["john_doe1.jpg", "john_doe2.png"],
-      "description": "whatever",
-      "table": "anything"
+      "country_flag": "singapore_flag.png",
+      "description": "someone",
+      "table": "T1"
     },
     {
       "name": "Jane Smith",
       "images": ["jane_smith.png"],
-      "description": "something",
-      "table": "doesn't matter"
+      "country_flag": "singapore_flag.png",
+      "description": "someone else",
+      "table": "T2"
     }
   ]
 }
 ```
 
-**Importantly, the folder contains the images (e.g. `pictures` in the example above), and the JSON file that maps names to images (e.g. `personnel.json`) need not have a fixed name, as long as they are located within the `data` folder (which needs to be exactly called `data`).**
+**The fields `flag_folder_path`, `country_flag`, `description` and `table` can be omitted if the deployment does not require these information.**
 
-#### Data Folder
+### `/data` Directory
 
-The `data` folder in `simpliFRy` is a **volume mount** as it is volume mounted to the `/app/data` directory within the docker container. Hence, it is the primary way to pass information to (e.g. folder of images, refer to [Data Preparation](#data-preparation) for more info) and from (logs) the container.
+The `data` directory in `simpliFRy` is a **volume mount** as it is volume mounted to the `/app/data` directory within the docker container. Hence, it is the primary way to pass information to (e.g. folder of images, refer to [Data Preparation](#data-preparation) for more info) and from (logs) the container.
 
-Directory structure
+Everytime the app is started, a new `.logs` file will be created in the `/data/logs` directory. It will list key actions undertaken by the simpliFRy app (and any error messages) in that session.
 
-```
-simpliFRy/
-├── data/
-|   ├── logs/
-|   |   ├── Logs YY-MM-DD hh-mm-ss.logs
-|   ├── pictures/
-|   |   ├── john_doe1.jpg
-|   |   ├── john_doe2.png
-|   |   └── jane_smith.png
-|   └── namelist.json
-└── other files and folders
-```
+## Pages
 
-Everytime the app is started, a new `.logs` file will be created. It will list key actions undertaken by the simpliFRy app in that session.
+The pages in this application are:
+- `localhost:1333`
+- `localhost:1333/seats`
+- `localhost:1333/old_layout`
+- `localhost:1333/settings`
 
 
 ### Settings

@@ -116,11 +116,17 @@ const updateDetectionList = (data) => {
         if (name == "UNKNOWN") {
             return;
         }
-        const table = getTable(name, namelistJSON);
+
+        let table = getTable(name, namelistJSON);
+        if (table == null) {
+            table = "";
+        } else {
+            table = "(" + table + ")"; 
+        }
 
         let detectionEl = document.createElement("div");
         detectionEl.classList.add("table-detection-element");
-        detectionEl.innerHTML = `${name} (${table})`;
+        detectionEl.innerHTML = `${name} ${table}`;
 
         detections.push(detectionEl);
     });

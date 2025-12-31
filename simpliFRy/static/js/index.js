@@ -27,6 +27,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (namelistPath != null) {
         loadNamelistJSON(namelistPath).then((data) => {
             namelistJSON = data;
+            console.log("loaded namelist")
         });
     }
 
@@ -49,7 +50,6 @@ const startStream = (no_stream_callback = () => {}) => {
                 mainContainer.style.display = "flex";
 
                 // Start detection overlays
-                console.log(namelistJSON);
                 fetchDetections();
             } else {
                 no_stream_callback();

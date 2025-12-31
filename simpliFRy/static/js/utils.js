@@ -26,8 +26,10 @@ export const getCountryFlag = (name, namelistJSON) => {
 
     if (person && person.country_flag) {
         // Construct the full path relative to data directory
-        const flagFolderPath = namelistJSON.flag_folder_path || "";
-        return `/data/${flagFolderPath}/${person.country_flag}`;
+        const flagFolderPath = namelistJSON.flag_folder_path;
+        if (flagFolderPath) {
+            return `/data/${flagFolderPath}/${person.country_flag}`;
+        }
     }
 
     return null;
