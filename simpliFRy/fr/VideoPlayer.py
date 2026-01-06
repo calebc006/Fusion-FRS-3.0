@@ -4,8 +4,8 @@ import time
 import sys
 from typing import Generator
 
-import cv2
 import numpy as np
+import cv2
 
 from utils import log_info
 
@@ -20,7 +20,7 @@ class VideoPlayer:
 
         # For modifiables
         self.vid_lock = threading.Lock()
-        self.frame_bytes = b""  # Initialize frame_bytes to avoid AttributeError
+        self.frame_bytes = b"" 
         self.ffmpeg_process = None
         self.streamThread = None
         self.inferenceThread = None
@@ -55,26 +55,6 @@ class VideoPlayer:
 
         log_info(f"Starting FFmpeg stream from: {stream_src}")
 
-        # command = [
-        #     "ffmpeg",
-        #     "-rtsp_transport", "tcp", 
-        #     "-i", stream_src.strip(),
-        #     "-vsync", "0",
-        #     "-copyts",
-        #     "-an",
-        #     "-sn",
-        #     "-f", "rawvideo",  # Video format is raw video
-        #     "-s", "1280x720",
-        #     "-pix_fmt", "bgr24",  # bgr24 pixel format matches OpenCV default pixels format.
-        #     "-probesize", "32",
-        #     "-analyzeduration", "0",
-        #     "-fflags", "nobuffer",
-        #     "-flags", "low_delay",
-        #     "-tune", "zerolatency",
-        #     "-b:v", "500k",
-        #     "-buffer_size", "1000k",
-        #     "-",
-        # ]
         command = [
             "ffmpeg",
 
@@ -96,11 +76,9 @@ class VideoPlayer:
             "-an",
             "-sn",
 
-            # MJPEG output
-            "-f", "image2pipe",
-            "-vcodec", "mjpeg",
-            "-q:v", "3",
-            "-pix_fmt", "yuv420p",
+            # RGB frames output
+            "-f", "rawvideo",
+            "-pix_fmt", "rgb24",
 
             # Buffering
             "-buffer_size", "64k",
@@ -126,7 +104,7 @@ class VideoPlayer:
             return
 
         # Give ffmpeg a brief moment to start and check if it failed immediately
-        time.sleep(0.1)  # Reduced from 0.5s for faster startup
+        time.sleep(0.1) 
         if ffmpeg_process.poll() is not None:
             # Process has already terminated
             try:
@@ -156,6 +134,7 @@ class VideoPlayer:
         frames_processed = 0
         last_data_time = None  # Will be set when we first receive data
 
+        # MAIN READ LOOP
         while not self.end_event.is_set():
             # Check if process has terminated
             if ffmpeg_process.poll() is not None:
@@ -195,34 +174,24 @@ class VideoPlayer:
                 continue
 
             # We got data!
-            last_data_time = time.time()
-
             buffer_bytes.extend(chunk)
+            frame_size = self.width * self.height * 3
 
-            while True:
-                start = buffer_bytes.find(b"\xff\xd8")  # JPEG start marker
-                end = buffer_bytes.find(b"\xff\xd9", start + 2) if start != -1 else -1
+            while len(buffer_bytes) >= frame_size:
+                frame_bytes = buffer_bytes[:frame_size]
+                del buffer_bytes[:frame_size]
 
-                if start == -1 or end == -1:
-                    break
-
-                jpg_bytes = buffer_bytes[start : end + 2]
-                del buffer_bytes[: end + 2]
-
-                # Pass through JPEG directly without decoding/re-encoding to eliminate latency
-                # Only decode if we need to check dimensions (which we skip if already correct)
-                # This eliminates ~50-100ms of encoding/decoding overhead per frame
                 with self.vid_lock:
-                    self.frame_bytes = jpg_bytes
-                
+                    self.frame_bytes = frame_bytes
+
                 frames_processed += 1
                 if frames_processed == 1:
-                    log_info("Successfully processed first frame from FFmpeg stream")
+                    log_info("Successfully processed first RGB frame from FFmpeg stream")
 
         else:
             self._handle_stream_end()
 
-            #ffmpeg_process.stdout.close()  # Closing stdout terminates FFmpeg sub-process.
+            # ffmpeg_process.stdout.close()  # Closing stdout terminates FFmpeg sub-process.
             if ffmpeg_process.poll() is None:
                 ffmpeg_process.terminate()
                 try:
@@ -315,11 +284,15 @@ class VideoPlayer:
         while self.streamThread.is_alive():
             with self.vid_lock:
                 frame_bytes = self.frame_bytes
-            if frame_bytes:  # Only yield if we have a frame
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
-                )
-            else:
-                # Very small sleep if no frame yet to prevent CPU spinning
-                time.sleep(0.001)
+
+            frame = np.frombuffer(frame_bytes, np.uint8).reshape(
+                (self.height, self.width, 3)
+            )
+
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            _, buffer = cv2.imencode(".jpg", frame_bgr)
+
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
+            )

@@ -214,6 +214,16 @@ The pages in this application are:
 - `localhost:1333/old_layout`
 - `localhost:1333/settings`
 
+### `.env` file
+
+To configure the Python web server, create a file named `.env` in the base directory. Its format should be:
+
+```
+APP_IP = 0.0.0.0
+APP_PORT = 1333
+APP_VIDEO = true
+APP_ENV = production
+```
 
 ### Settings
 

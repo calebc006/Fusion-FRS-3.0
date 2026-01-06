@@ -3,6 +3,7 @@ import json
 import os
 import signal
 import time
+from dotenv import load_dotenv
 
 from flask import Flask, Response, render_template, request, redirect, url_for, send_from_directory
 from flask_cors import CORS
@@ -12,6 +13,7 @@ from utils import log_info
 from types import SimpleNamespace
 import atexit
 
+load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
@@ -27,7 +29,7 @@ def _default_config_from_env():
         ipaddress=os.getenv("APP_IP", "0.0.0.0"),
         port=int(os.getenv("APP_PORT", "1333")),
         video=os.getenv("APP_VIDEO", "true").lower(),
-        env=os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development")).lower(),
+        env=os.getenv("APP_ENV", "development").lower(),
     )
 
 

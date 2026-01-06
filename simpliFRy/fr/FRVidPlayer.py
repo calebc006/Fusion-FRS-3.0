@@ -6,9 +6,9 @@ import threading
 import traceback
 from datetime import datetime, timedelta
 from typing import Generator, TypedDict
+import subprocess
 
 import numpy as np
-from torch import cuda
 from insightface.app import FaceAnalysis
 from voyager import Index, Space
 from PIL import Image
@@ -17,6 +17,14 @@ from tqdm import tqdm
 from fr import VideoPlayer
 from sql_db import get_db, recreate_table, fetch_records, save_record
 from utils import calc_iou, log_info
+
+
+def is_cuda_available():
+    try:
+        subprocess.check_output(['nvidia-smi'])
+        return True
+    except (Exception, FileNotFoundError):
+        return False
 
 
 FR_SETTINGS_FP = 'settings.json'
@@ -63,10 +71,7 @@ class FRVidPlayer(VideoPlayer):
 
         super().__init__()
 
-
-        provider: str = (
-            "CUDAExecutionProvider" if cuda.is_available() else "CPUExecutionProvider"
-        )
+        provider = "CUDAExecutionProvider" if is_cuda_available() else "CPUExecutionProvider"
 
         # For FR algorithm
         self.model = FaceAnalysis(providers=[provider])
@@ -381,7 +386,7 @@ class FRVidPlayer(VideoPlayer):
             if not frame_bytes:
                 return [{"label": "Unknown"}]
 
-            img = Image.open(io.BytesIO(frame_bytes)).convert("RGB")
+            img = Image.frombytes("RGB", (self.width, self.height), frame_bytes)
 
             width, height = img.size
             img = np.array(img)

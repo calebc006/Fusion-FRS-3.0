@@ -45,7 +45,7 @@ RUN cd /usr/local/lib/python3.10/dist-packages/torch/lib && ln -s libnvrtc-672ee
 # Copy and unzip the buffalo model files
 COPY buffalo_l.zip /root/.insightface/models/buffalo_l.zip
 RUN unzip "/root/.insightface/models/buffalo_l.zip" -d "/root/.insightface/models/buffalo_l" && \
-    rm "/root/.insightface/models/buffalo_l.zip"
+rm "/root/.insightface/models/buffalo_l.zip"
 
 # Expose port 1333
 EXPOSE 1333

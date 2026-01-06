@@ -14,3 +14,5 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    env_file:
+      - ./.env
