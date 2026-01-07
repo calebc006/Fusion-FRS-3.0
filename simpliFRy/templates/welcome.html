@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FR Live</title>
+    <link rel="icon" href="../static/images/fusionlogo.png" />
+    <link rel="stylesheet" href="../static/css/main.css" />
+    <link rel="stylesheet" href="../static/css/welcome.css" />
+    <link rel="stylesheet" href="../static/css/taskbar.css" />
+  </head>
+  <body
+    class="bg-image"
+    style="background-image: url('../static/images/welcome_bg.png')"
+  >
+    <!-- Logos -->
+    <div class="flex-container-logo">
+      <img class="logo" src="../static/images/armylogo.png" />
+      <img class="logo" src="../static/images/11logo.png" />
+      <img class="fusion-logo" src="../static/images/fusionlogo.png" />
+    </div>
+
+    <!-- Contains flags and detections -->
+    <div id="main-container">
+      <div id="country-flag-container" class="country-flag-container">
+        <img
+          id="country-flag-img"
+          src=""
+          alt="Country Flag"
+          style="display: none"
+        />
+      </div>
+      <div class="detection-list-container">
+        <div class="detections" id="detections-list"></div>
+      </div>
+    </div>
+
+    <!-- Video Modal -->
+    <div id="video-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Video Feed</h2>
+          <button id="close-video-modal" class="modal-close">×</button>
+        </div>
+        <div id="video-container">
+          <object id="video-feed" type="image/jpeg">
+            <img src="../static/images/default.jpg" alt="default video image" />
+          </object>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Taskbar -->
+    <div class="taskbar-placeholder">
+      <div class="taskbar">
+          <button id="home-button">Home</button>
+          <button id="open-video-modal-button">Open Video</button>
+      </div>
+    </div>
+
+    <script type="module" src="../static/js/welcome.js"></script>
+    <script type="module" src="../static/js/taskbar.js"></script>
+  </body>
+</html>

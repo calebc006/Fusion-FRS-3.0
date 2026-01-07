@@ -163,9 +163,15 @@ def index():
 
     return render_template("index.html")
 
+@app.route("/welcome")
+def welcomd():
+    """Renders a welcome screen with large names, flag, and popup video modal"""
+
+    return render_template("welcome.html")
+
 @app.route("/seats")
 def seats():
-    """Renders a page with the seating plan, with seats that light up upon detection."""
+    """Renders a page with the seating plan, with seats that light up upon detection"""
 
     return render_template("seats.html")
 

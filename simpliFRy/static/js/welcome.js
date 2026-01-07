@@ -1,0 +1,266 @@
+import {
+    getCountryFlag,
+    getDescription,
+    setBBoxPos,
+    clearBBoxes,
+    loadNamelistJSON,
+    delay,
+} from "./utils.js";
+
+const N = 3; // number of detections shown (last N)
+
+const detectionList = document.getElementById("detections-list");
+const countryFlagImg = document.getElementById("country-flag-img");
+const videoModal = document.getElementById("video-modal");
+const videoContainer = document.getElementById("video-container");
+let namelistPath = null;
+let namelistJSON = undefined;
+let currData = [];
+
+window.addEventListener("DOMContentLoaded", async () => {
+    videoModal.classList.add("hidden");
+
+    namelistPath = localStorage.getItem("namelistPath");
+    if (namelistPath != null) {
+        loadNamelistJSON(namelistPath).then((data) => {
+            namelistJSON = data;
+            console.log("loaded namelist")
+        });
+    }
+
+    startStream(() =>
+        alert(`FFMPEG unable to stream from provided source!`)
+    );
+});
+
+// ENTRY POINT: Check if stream is started and immediately loads video feed if it has
+const startStream = (no_stream_callback = () => {}) => {
+    fetch("/checkAlive")
+        .then((response) => response.text())
+        .then((data) => {
+            if (data === "Yes") {
+                // Start detection overlays
+                fetchDetections();
+            } else {
+                no_stream_callback();
+            }
+        })
+        .catch((error) => console.log(error));
+};
+
+
+// ----------- Welcome page detections ------------
+
+// Update country flag display
+const updateCountryFlag = (detectionName) => {
+    if (!detectionName || detectionName === "Unknown") {
+        countryFlagImg.style.display = "none";
+        return;
+    }
+
+    const flagPath = getCountryFlag(detectionName, namelistJSON);
+    if (flagPath) {
+        countryFlagImg.src = flagPath;
+        countryFlagImg.style.display = "block";
+    } else {
+        countryFlagImg.style.display = "none";
+    }
+};
+
+// Update detection list with new element
+const addDetectionEl = (name, description) => {
+    const detectionEl = document.createElement("div");
+    detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${
+        description === null
+            ? ""
+            : `<p class="detectionDesc">${description}</p>`
+    }`;
+    // detectionEl.innerHTML = `<p class="detectionName">${name}</p>`;
+    detectionEl.classList.add("detectionEntry");
+
+    detectionList.appendChild(detectionEl);
+
+    // show last N detections
+    if (detectionList.children.length > N) {
+        detectionList.replaceChildren(
+            ...sortDetections([...detectionList.children]).slice(-N)
+        );
+    } else {
+        detectionList.replaceChildren(
+            ...sortDetections([...detectionList.children])
+        );
+    }
+};
+
+// MAIN LOOP
+export const fetchDetections = () => {
+    console.log("FETCHING...");
+    let buffer = "";
+    let data = [];
+
+    fetch(`/frResults`).then((response) => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        const processStream = () => {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    clearBBoxes(videoContainer);
+                    detectionList.innerHTML = "";
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+
+                const parts = buffer.split("\n");
+
+                try {
+                    if (parts.length > 1) {
+                        data = JSON.parse(parts[parts.length - 2])?.data;
+                        // console.log(data[0].label + "\r")
+                    }
+                } catch (err) {
+                    console.log(buffer);
+                    console.error("Error parsing JSON:", err);
+                }
+
+                buffer = parts[parts.length - 1];
+                updateDetections(data);
+
+                processStream();
+            });
+        };
+
+        processStream();
+    });
+};
+
+export const endDetections = () => {
+    currData = [];
+    const detectionList = document.getElementById("detections-list");
+    detectionList.innerHTML = "";
+    clearBBoxes(videoContainer);
+
+    // Clear the country flag
+    countryFlagImg.style.display = "none";
+};
+
+// takes in an array of HTML detection elements and returns a sorted list
+const sortDetections = (detectionList) => {
+    return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText));
+};
+
+const updateDetections = (data) => {
+    currData = [];
+    detectionList.innerHTML = "";
+    clearBBoxes(videoContainer);
+    const uniqueLabels = new Set();
+    let mostRecentDetection = null;
+
+    // Process detections in order of detection (no sorting)
+    data.forEach((detection) => {
+        const unknown = detection.label === "Unknown";
+
+        // if you want to hide unknown bboxes
+        // if (unknown) {
+        //   return;
+        // }
+
+        if (!unknown && !uniqueLabels.has(detection.label)) {
+            const description = getDescription(detection.label, namelistJSON);
+            addDetectionEl(detection.label, description);
+            uniqueLabels.add(detection.label);
+        }
+
+        // Track the last non-unknown detection as the most recent
+        if (!unknown) {
+            mostRecentDetection = detection.label;
+        }
+
+        if (!detection.bbox) return;
+
+        const bboxEl = document.createElement("div");
+        bboxEl.classList.add("bbox");
+        if (!unknown) {
+            bboxEl.classList.add("bbox-identified");
+        }
+
+        // old UI for blue and red boxes
+        bboxEl.innerHTML = `<p class="bbox-label${
+            unknown ? "" : " bbox-label-identified"
+        }">${
+            detection.label
+        } <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
+
+        // new UI with all blue boxes
+        // bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
+
+        currData.push(detection.bbox);
+        setBBoxPos(
+            bboxEl,
+            detection.bbox,
+            videoContainer.offsetWidth,
+            videoContainer.offsetHeight
+        );
+        videoContainer.appendChild(bboxEl);
+    });
+
+    // Update country flag for the latest detection
+    if (mostRecentDetection) {
+        updateCountryFlag(mostRecentDetection);
+    } else {
+        // No identified detections in current list, hide flag
+        countryFlagImg.style.display = "none";
+    }
+};
+
+// -------- VIDEO MODAL STUFF ----------
+
+// Handle resizing of modal
+window.addEventListener("resize", () => {
+    const videoContainer = document.getElementById("video-container");
+    const bboxesEl = videoContainer.querySelectorAll(".bbox");
+    bboxesEl.forEach((element, idx) => {
+        setBBoxPos(
+            element,
+            currData[idx],
+            videoContainer.offsetWidth,
+            videoContainer.offsetHeight
+        );
+    });
+});
+
+const showVideoModal = () => {
+    videoModal.classList.remove("hidden");
+};
+
+const hideVideoModal = () => {
+    videoModal.classList.add("hidden");
+};
+
+// Handles taskbar button to open video modal
+const openVideoModalButton = document.getElementById("open-video-modal-button");
+if (openVideoModalButton) {
+    openVideoModalButton.addEventListener("click", () => {
+        const videoFeed = document.getElementById("video-feed");
+        videoFeed.setAttribute("data", `/vidFeed?t=${Date.now()}`);
+
+        showVideoModal();
+    });
+}
+
+// Close video model button
+document.getElementById("close-video-modal").addEventListener("click", (e) => {
+    hideVideoModal();
+    const videoFeed = document.getElementById("video-feed");
+    videoFeed.removeAttribute("data");
+});
+
+// Close video modal on Escape key
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !videoModal.classList.contains("hidden")) {
+        hideVideoModal();
+        const videoFeed = document.getElementById("video-feed");
+        videoFeed.removeAttribute("data");
+    }
+});

@@ -33,28 +33,38 @@
 }
 
 #open-video-modal-button {
-    background-color: rgba(50, 167, 50, 0.8);
+    background-color: rgba(68, 148, 68, 0.8);
+    cursor: pointer;
 }
 
 #open-video-modal-button:hover {
-    background-color: rgba(50, 167, 50, 0.5);
+    background-color: rgba(68, 148, 68, 0.5);
 }
 
 #toggle-seating-button {
-    background-color: rgba(19, 84, 206, 0.8);
+    background-color: rgba(190, 19, 206, 0.8);
 }
 
 #toggle-seating-button:hover {
-    background-color: rgba(19, 84, 206, 0.5);
+    background-color: rgba(190, 19, 206, 0.5);
 }
 
 #home-button {
-  background-color: rgb(5, 145, 17);
+    background-color: rgba(19, 84, 206, 0.8);
 }
 
 #home-button:hover {
-  background-color: rgb(0, 121, 10);
+    background-color: rgba(19, 84, 206, 0.5);
 }
+
+#settings-button {
+    background-color: rgba(65, 60, 60, 0.8);
+}
+
+#settings-button:hover {
+    background-color: rgba(100, 93, 93, 0.527);
+}
+
 
 .taskbar.show {
     visibility: visible;

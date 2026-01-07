@@ -4,61 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FR Live</title>
-    <link rel="icon" href="../static/fusionlogo.png" />
+    <link rel="icon" href="../static/images/fusionlogo.png" />
     <link rel="stylesheet" href="../static/css/main.css" />
     <link rel="stylesheet" href="../static/css/index.css" />
     <link rel="stylesheet" href="../static/css/taskbar.css" />
-    <link rel="stylesheet" href="../static/css/form.css" />
   </head>
   <body
     class="bg-image"
-    style="background-image: url('../static/welcome_bg.png')"
   >
     <!-- Logos -->
     <div class="flex-container-logo">
-      <img class="logo" src="../static/armylogo.png" />
-      <img class="logo" src="../static/11logo.png" />
-      <img class="fusion-logo" src="../static/fusionlogo.png" />
-    </div>
-
-    <!-- Contains flags and detections -->
-    <div id="main-container">
-      <div id="country-flag-container" class="country-flag-container">
-        <img
-          id="country-flag-img"
-          src=""
-          alt="Country Flag"
-          style="display: none"
-        />
-      </div>
-      <div class="detection-list-container">
-        <div class="detections" id="detections-list"></div>
-      </div>
-    </div>
-
-    <!-- Bottom Taskbar -->
-    <div class="taskbar-placeholder">
-      <div class="taskbar">
-        <button id="open-video-modal-button">Open Video</button>
-        <button id="end_stream_button">End Stream</button>
-        <button id="settings-button">Settings</button>
-      </div>
-    </div>
-
-    <!-- Video Modal -->
-    <div id="video-modal" class="modal hidden">
-      <div class="modal-overlay"></div>
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Video Feed</h2>
-          <button id="close-video-modal" class="modal-close">×</button>
-        </div>
-        <div id="video-container">
-          <object id="video-feed" type="image/jpeg">
-            <img src="../static/default.jpg" alt="default video image" />
-          </object>
-        </div>
-      </div>
+      <img class="logo" src="../static/images/armylogo.png" />
+      <img class="logo" src="../static/images/11logo.png" />
+      <img class="fusion-logo" src="../static/images/fusionlogo.png" />
     </div>
 
     <!-- Initialisation form -->
@@ -98,10 +56,13 @@
         placeholder="Enter custom RTSP URL"
       />
 
-      <div class="break"></div>
-      <label for="data_file">Path to JSON file</label>
-      <input type="text" id="data_file" class="init-input" name="data_file" />
-      <div class="break"></div>
+      <div id="drop-zone" class="drop-zone">
+        <p>Drag and drop your JSON file here</p>
+        <p class="drop-zone-divider">or</p>
+        <button type="button" id="file-button" class="file-button">Browse Files</button>
+      </div>
+      <input type="hidden" id="data_file" name="data_file" />
+      <p id="file-name" class="file-name"></p>
 
       <input
         type="submit"
@@ -110,6 +71,46 @@
         value="Submit"
       />
     </form>
+
+    <!-- Post-init Screen -->
+    <div id="info-menu">
+      <h2>FR initialized!</h2>
+      <p>Stream URL: <span id="stream-url"></span></p>
+      <p>Namelist Path: <span id="namelist-path"></span></p>      
+      <button id="open-video-modal-button" class="nav-button" style="margin-top: 1em;">Open Video</button>
+      <br /><br /><br />
+
+      <p style="font-family:'Courier';">Check out different views:</p>
+      <div style="font-family:'Courier';" class="nav-buttons">
+        <a href="/welcome" class="nav-button">/welcome</a>
+        <a href="/seats" class="nav-button">/seats</a>
+        <a href="/old_layout" class="nav-button">/old_layout</a>
+      </div>
+    </div>
+
+    <!-- Video Modal -->
+    <div id="video-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Original Video Feed (No Detections)</h2>
+          <button id="close-video-modal" class="modal-close">×</button>
+        </div>
+        <div id="video-container">
+          <object id="video-feed" type="image/jpeg">
+            <img src="../static/images/default.jpg" alt="default video image" />
+          </object>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Taskbar -->
+    <div class="taskbar-placeholder">
+      <div class="taskbar">
+        <button id="reset-button">Reset</button>
+        <button id="settings-button">Settings</button>
+      </div>
+    </div>
 
     <script type="module" src="../static/js/index.js"></script>
     <script type="module" src="../static/js/taskbar.js"></script>
