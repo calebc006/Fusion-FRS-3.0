@@ -108,6 +108,12 @@ class Records {
 
     updateData(data) {
         Object.entries(data).map(([name, details]) => {
+            // Update the data object with new values
+            if (this.data[name]) {
+                this.data[name].attendance = details.attendance;
+                this.data[name].tags = details.tags || [];
+            }
+            
             const nameStr = `'${name}'`
             this.data[name].buttonEl.innerHTML = `
             <button type="button" class="toggle-attendance" onclick="handleMark(${nameStr})">
@@ -115,6 +121,8 @@ class Records {
                     </button>
             `
         })
+        // Apply filters after updating data
+        this.applyAllFilters();
     }
 
     mark(name) {
