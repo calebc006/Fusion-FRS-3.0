@@ -1,101 +1,243 @@
 # Gotendance
 
+A lightweight attendance tracking application built with Go that processes real-time results from facial recognition systems.
+
 ![Project Logo](static/favicon.ico)
 
 ---
 
 ## Table of Contents
 
-- [Description](#description)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Building from Source](#building-from-source)
+  - [Distribution](#distribution)
+- [How to Use](#how-to-use)
+  - [Starting the Application](#starting-the-application)
+  - [Loading Personnel Data](#loading-personnel-data)
+  - [Connecting Result Streams](#connecting-result-streams)
+  - [Viewing and Managing Attendance](#viewing-and-managing-attendance)
+- [API Endpoints](#api-endpoints)
+- [For Developers](#for-developers)
 
 ---
 
-## Description
+## Overview
 
-**Gotendance** is an attendance tracking app to accompany [**simpliFRy**](../simpliFRy/). They can be used together for facial recognition attendance taking. Gotendance is built primarily from the <ins>Go</ins> programming language, and its Web UI is made from <ins>HTML/CSS/JS</ins>. This enables it to be lightweight and easy to deploy. 
+**Gotendance** is an attendance tracking app designed to work with [**simpliFRy**](../simpliFRy/) for automated facial recognition attendance taking. Built primarily with **Go** and a vanilla **HTML/CSS/JavaScript** web interface, it is lightweight, portable, and easy to deploy without requiring complex runtime dependencies.
 
-If you are a developer and would like to understand more about how gotendance works, refer to the [Developer Guide](Developer%20Guide.md)
+The application listens to real-time result streams (such as facial recognition data) and automatically updates attendance records, while also allowing manual attendance management through a clean web interface.
 
----
-
-## Features
-
-### Easy Installation and Deployment
-
-Golang programs are able to be compiled to a binary executable while vanilla javascript allows the UI to be run by any browser without a need for a JavaScript runtime module such as NodeJS. Once the executable is built, this app can be easily distributed by copying the binary `.exe` file and the `templates` and `static` folders.
-
-### Concise Design
-
-Gotendance did not include many of the features present in [the previous attendance app](https://github.com/CJBuzz/FRS), and is designed to be as simple and lightweight as possible. This is because many of those features were mostly unused. Furthermore, although the previous app tried to be as versatile as possible by anticipating what users might want, additional features not present in that app were often requested. Almost all of those requested features were only used for that one specific use case. Therefore, it felt prudent to disregard the attempt at having a 'one-size-fit-all' app and instead adopt a concise design, while providing ways to build other services off this app (and simpliFRy) in a microservice architecture. 
+**Technology Stack:**
+- Backend: Go (Golang)
+- Frontend: HTML, CSS, vanilla JavaScript
+- No external runtime dependencies (Node.js, etc.) required
 
 ---
 
-## Installation
+## Key Features
+
+### 🚀 Easy Installation and Deployment
+
+Golang programs compile to a single binary executable, and the vanilla JavaScript UI runs in any modern browser without needing Node.js or other JavaScript runtimes. Once built, the application can be distributed by simply copying:
+- The executable file (`gotendance.exe`)
+- The `templates` folder
+- The `static` folder
+
+No installation process is needed on the target machine.
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-- [Golang](https://go.dev/doc/install)
+- [Go](https://go.dev/doc/install) (version 1.16 or later recommended)
 
-### Installation via Docker
+### Building from Source
 
 1. Clone the repository:
-
    ```bash
    git clone https://github.com/CJBuzz/Real-time-FRS-2.0.git
    ```
 
-2. Navigate to gotendance directory
-
+2. Navigate to the gotendance directory:
    ```bash
    cd gotendance
    ```
 
-3. Build Executable
+3. Build the executable:
    ```bash
    go build
    ```
 
-A executable file `gotendance.exe` will be produced. You can copy this file, together with the `static` and `templates` folders into other directories and computers and run the gotendance app without any issue. Just ensure that `gotendance.exe`, `static` and `templates` are in the same directory. 
+This will generate a `gotendance.exe` file (on Windows) or `gotendance` binary (on Linux/Mac).
+
+### Distribution
+
+Once built, the application can be distributed as a self-contained package. Copy these items together:
 
 ```
 folder/
-├── static/
-├── templates/
-└── gotendance.exe
+├── static/          # CSS, JavaScript, and other static assets
+├── templates/       # HTML templates for the web interface
+└── gotendance.exe   # The compiled executable
 ```
 
-## Usage
+Ensure all three components remain in the same directory. The application will run on any machine without requiring Go to be installed.
+
+---
+
+## How to Use
 
 ### Starting the Application
 
-Click on `gotendance.exe` to run the app.
+1. Run the executable:
+   - **Windows**: Double-click `gotendance.exe`
+   - **Linux/Mac**: Run `./gotendance` in terminal
 
-Access the web UI at <http://127.0.0.1:1500> (preferably using Microsoft Edge)
+2. The server will start on port 1500
 
-### Using with simpliFRy
+3. Open your web browser and navigate to:
+   ```
+   http://localhost:1500
+   ```
+   or
+   ```
+   http://127.0.0.1:1500
+   ```
+
+   > **Recommended browser**: Chromium-based browser
+
+### Loading Personnel Data
 
 ![Home Page](assets/main_page.png)
 
-1. Load the JSON file prepared for simpliFRy into *Load Personnel List* file input and click the upload icon. [Here](../simpliFRy/ReadME.md#data-preparation) is more information on preparation of this file. A sample JSON file in `assets/test.json` has been provided. 
+1. On the home page, locate the **Load Personnel List** section
 
-2. Enter the simpliFRy results stream url into the *FR Results Stream URL* input and submit (have to ensure simpliFRy is running).
+2. Prepare a JSON file with the personnel list in the following format:
+   ```json
+   {
+     "data": [
+       {"label": "John Doe"},
+       {"label": "Jane Smith"},
+       {"label": "Alex Johnson"}
+     ]
+   }
+   ```
+   
+   A sample file is provided at `assets/test.json`. For more details on data preparation, see the [simpliFRy data preparation guide](../simpliFRy/ReadME.md#data-preparation).
 
-  - **FR Results Stream URL** (string): results stream from simpliFRy, the endpoint is `/frResults`. IP and port depends on where simpliFRy is ran. The results stream is a HTTP Streaming Response, of [this format](../simpliFRy/Developer%20Guide.md#4-access-fr-results).
-  - **Update Interval** (float): number of seconds between each update of gotendance's internal records. This is to reduce unnecessary computations (so gotendance does not keep going through the results continuously, especially when much of it is repeated). However, it is ideal that this number is less than [**Holding Time**](../simpliFRy/Developer%20Guide.md#holding-time) as some detections may be missed otherwise.
+3. Click the file input, select your JSON file, and click the upload icon
 
-Multiple results stream can be added. Gotendance will listen to all of them concurrently.
+4. The personnel list will be loaded into the system
 
-3. The URL of the successfully added stream will be displayed under *Results Stream* below. You can remove any results stream and gotendance will stop listening to that results.
+### Connecting Result Streams
 
-4. Access the attendance records page on <http://127.0.0.1:1500/records>.
+Gotendance listens to HTTP streaming responses from services like simpliFRy to automatically update attendance records.
+
+1. **Ensure your result stream service is running** (e.g., simpliFRy)
+
+2. In the **FR Results Stream URL** section, enter the stream URL:
+   - For simpliFRy: `http://<IP>:<PORT>/frResults`
+   - Example: `http://192.168.1.100:5000/frResults`
+   
+   The stream should provide data in this format:
+   ```json
+   {
+     "data": [
+       {"label": "John Doe"},
+       {"label": "Jane Smith"}
+     ]
+   }
+   ```
+
+3. Set the **Update Interval** (in seconds):
+   - This controls how often gotendance processes the incoming stream
+   - Lower values = more frequent updates but higher CPU usage
+   - Recommended: Keep it less than the [Holding Time](../simpliFRy/Developer%20Guide.md#holding-time) of simpliFRy to avoid missing detections
+   - Default suggestion: 1-5 seconds
+
+4. Click **Submit** to add the stream
+
+5. **Managing streams**:
+   - Successfully added streams appear under **Results Stream** section
+   - Multiple streams can be added and will be processed concurrently
+   - To remove a stream, click the remove button next to its URL
+   - Gotendance will immediately stop listening to removed streams
+
+### Viewing and Managing Attendance
 
 ![Records Page](assets/records.png)
 
-Names with a checkmark beside it means they have been detected by simpliFRy.
+1. Navigate to the records page:
+   ```
+   http://localhost:1500/records
+   ```
 
-You can manually mark an individual as 'Present' or 'Absent' by clicking on the checkbox icon.
+2. **Understanding the display**:
+   - Names with a ✓ checkmark have been detected by the recognition system
+   - The checkbox icon shows the current attendance status
+
+3. **Manual attendance management**:
+   - Click any checkbox to toggle between Present/Absent
+   - This allows manual overrides when needed (e.g., for technical issues or special cases)
+
+4. **Resetting attendance**:
+   - Use the reset function on the home page to clear all attendance records
+   - Useful for starting a new session or event
+
+5. **Exporting data**:
+   - Attendance records are automatically saved to `output.json`
+   - Records persist across application restarts
+
+---
+
+## API Endpoints
+
+For developers integrating gotendance with other services, the following REST API endpoints are available:
+
+### GET `/fetchAttendance`
+Fetch current attendance list with detection details
+- **Response**: JSON object with attendance status, detection status, and timestamps for each person
+
+### POST `/changeAttendance?name={name}`
+Toggle attendance status for a specific person
+- **Parameters**: `name` (query parameter, must match exact name in system)
+
+### GET `/getCount`
+Get summary statistics
+- **Response**: Total count, detected count, and attended count
+
+### POST `/initData`
+Load personnel list from JSON file
+- **Body**: Multipart form with JSON file
+
+### POST `/startCollate`
+Add a new result stream
+- **Parameters**: `frUrl` (string), `updateInterval` (float)
+
+### POST `/stopCollate?frUrl={url}`
+Remove a result stream
+- **Parameters**: `frUrl` (query parameter)
+
+### POST `/resetAttendance`
+Reset all attendance records to absent
+
+For detailed API documentation and information on creating custom result streams, refer to the [Developer Guide](Developer%20Guide.md).
+
+---
+
+## For Developers
+
+If you are a developer looking to:
+- Understand the internal architecture
+- Create custom result streams
+- Integrate gotendance with other services
+- Build additional features
+
+Please refer to the comprehensive [Developer Guide](Developer%20Guide.md) for detailed technical documentation.
 
 To reset the attendance, repeat *Step 1*.

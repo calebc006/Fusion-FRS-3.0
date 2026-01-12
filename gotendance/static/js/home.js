@@ -83,10 +83,14 @@ fileInputEl.addEventListener('change', () => {
 })
 
 const fileForm = document.getElementById('fileForm')
+const uploadStatusEl = document.getElementById('upload-status')
+const uploadStatusTextEl = document.getElementById('upload-status-text')
+
 fileForm.addEventListener('submit', (event) => {
     event.preventDefault()
 
     const formData = new FormData(fileForm)
+    const fileName = fileInputEl.files[0].name
     
     fetch(fileForm.action, {
         method: fileForm.method,
@@ -97,8 +101,46 @@ fileForm.addEventListener('submit', (event) => {
     }).then(_data => {
         fileNameLabelEl.innerHTML = "Select File"
         fileForm.reset()
+        // Show filename
+        uploadStatusEl.classList.remove('error')
+        uploadStatusTextEl.textContent = `Loaded: ${fileName}`
+        uploadStatusEl.style.display = 'block'
+        // Persist to localStorage
+        localStorage.setItem('lastLoadedFile', fileName)
     }).catch(error => {
         console.log("Fetch operation failed", error)
-        alert(`Error loading JSON file`)
+        // Show error message
+        uploadStatusEl.classList.add('error')
+        uploadStatusTextEl.textContent = '✗ Error loading JSON file'
+        uploadStatusEl.style.display = 'block'
     })
+})
+
+// Restore file status on page load
+window.addEventListener('load', () => {
+    const lastLoadedFile = localStorage.getItem('lastLoadedFile')
+    if (lastLoadedFile) {
+        // Verify that data is actually loaded by checking /fetchAttendance
+        fetch('/fetchAttendance')
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to fetch')
+                return response.json()
+            })
+            .then(data => {
+                // Only show status if we have actual personnel data
+                if (data && Object.keys(data).length > 0) {
+                    uploadStatusEl.classList.remove('error')
+                    uploadStatusTextEl.textContent = `Loaded: ${lastLoadedFile}`
+                    uploadStatusEl.style.display = 'block'
+                } else {
+                    uploadStatusEl.style.display = 'none'
+                    localStorage.removeItem('lastLoadedFile')
+                }
+            })
+            .catch(error => {
+                console.log("Error verifying loaded data", error)
+                uploadStatusEl.style.display = 'none'
+                localStorage.removeItem('lastLoadedFile')
+            })
+    }
 })

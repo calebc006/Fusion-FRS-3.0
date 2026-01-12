@@ -27,10 +27,17 @@
       <div class="attendance" id="attendance"></div>
       <div class="percentage" id="percentage"></div>
 
-      <div class="filter-buttons">
-        <button onclick="records.filterRecords('all')">All</button>
-        <button onclick="records.filterRecords('present')">Present</button>
-        <button onclick="records.filterRecords('absent')">Absent</button>
+      <div class="filter-container">
+        <label for="status-filter">Filter by Status:</label>
+        <select id="status-filter" onchange="records.filterRecords(this.value)">
+          <option value="all">All</option>
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+        </select>
+      </div>
+
+      <div class="tag-filter-buttons" id="tag-filter-buttons">
+        <!-- Tag filter buttons will be dynamically added here -->
       </div>
       
   </div>
@@ -49,9 +56,20 @@
     </table>
     </div>
     
+    <div class="button-container">
+        <a type="button" class="export-button" download="attendance" href="./fetchAttendance">Export</a>
+    </div>
+    <button type="button" id="reset-attendance-btn" class="reset-button">Reset All Attendance</button>
+    
+    <hr class="section-break" />
+    <div id="streams">
+        <h2 class="title">Result Streams</h2>
+        <div id="streams-list" class="entry-list">
+            <!-- Streams will be loaded here -->
+        </div>
+    </div>
     
     <script src='/static/js/records.js'></script>
-    <div class="button-container"><a type="button" class="export-button" download="attendance" href="./fetchAttendance">Export</a></div>
     <!-- <div class="button-container">
       <script>
         var HrefData = {url: href="http://localhost:1500/fetchAttendance"}

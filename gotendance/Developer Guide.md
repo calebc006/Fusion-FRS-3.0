@@ -1,31 +1,45 @@
 # Developer's Guide for Gotendance
 
-> This file provides information about some of gotendance's API endpoints that other services can interact with, and also how to use gotendance with other result streams.
+> This file provides information about gotendance's API endpoints that other services can interact with, and how to use gotendance with other result streams.
+
+---
 
 ## Table of Contents
 
+- [Architecture Overview](#architecture-overview)
 - [Result Stream](#result-stream)
-- [API Endpoints](#api-endpoints)
+- [API Reference](#api-reference)
+
+---
+
+## Architecture Overview
+
+Gotendance uses a concurrent architecture for real-time stream processing:
+
+- **Store**: Thread-safe in-memory data store for attendance records with mutex locks
+- **Stream Manager**: Manages multiple concurrent result streams, each in its own goroutine
+- **HTTP Server**: Lightweight web server on port 1500 with RESTful API endpoints
+
+Data persists to `output.json` and is automatically loaded on startup.
 
 ---
 
 ## Result Stream
 
-**Gotendance** updates its attendance list by listening to a results stream from a separate service. Though intended to work with [**simpliFRy**](../simpliFRy/)'s `/frResults` endpoint, gotendance can be used with other services sending a results stream as well. 
+**Gotendance** updates its attendance list by listening to a results stream from a separate service. Though intended to work with [**simpliFRy**](../simpliFRy/)'s `/frResults` endpoint, gotendance can be used with other services sending a results stream as well.
 
-Below is the format of a results stream's JSON output, which is repeatedly given in a ***HTTP Streaming Response***.
+Below is the format of a results stream's JSON output, which is repeatedly given in a ***HTTP Streaming Response***:
 
-```js
+```json
 {
-    "data": [
+  "data": [
     {
-        "label": "John Doe", // Individual's name
+      "label": "John Doe"
     },
     {
-        "label": "Jane Smith"
-    } 
-    // Other similar objects below
-    ]
+      "label": "Jane Smith"
+    }
+  ]
 }
 ```
 
@@ -37,7 +51,6 @@ Flask app example (with `/resultsStream` as an endpoint):
 
 ```python
 import json
-
 from flask import Flask, Response
 
 app = Flask(__name__)
@@ -68,63 +81,189 @@ if __name__ == "__main__":
 
 ---
 
-## API Endpoints
+## API Reference
 
-#### 1. Fetch Current Attendance List
+All endpoints return JSON responses. Successful operations return `{"status": "ok"}` unless otherwise specified.
 
-- **Endpoint**: `/fetchAttendance`
-- **Method**: `GET`
-- **Description**: Fetch current attendance list. `attendance` is the value shown on the "Records" page whereas `detection` shows whether the individual has actually been sent from the results stream of another service (e.g. facial recognition in simpliFRy) or not. 
+### Data Management
+
+#### Load Personnel List
+
+**Endpoint:** `POST /initData`
+
+**Description:** Initialize or update the personnel list from a JSON file.
+
+**Request:**
+- Method: `POST`
+- Content-Type: `multipart/form-data`
+- Body: Form data with file field named `jsonFile`
+
+**File Format:**
+```json
+{
+  "img_folder_path": "/path/to/images",
+  "details": [
+    {
+      "name": "John Doe",
+      "images": ["john1.jpg", "john2.jpg"],
+      "tags": ["staff", "department-a"]
+    },
+    {
+      "name": "Jane Smith",
+      "images": ["jane1.jpg"],
+      "tags": ["student"]
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok"
+}
+```
+
+**Notes:**
+- Previous attendance data is preserved when reloading
+- Names must be unique
+- The `tags` field is stored but not currently used by the UI
+
+---
+
+#### Fetch Attendance Records
+
+**Endpoint:** `GET /fetchAttendance`
+
+**Description:** Retrieve the current attendance list with all detection details and timestamps.
+
+**Request:**
+- Method: `GET`
+- Parameters: None
+
+**Response:**
+```json
+{
+  "Jane Smith": {
+    "attendance": false,
+    "detected": true,
+    "firstSeen": "2026-01-12T14:30:45Z",
+    "lastSeen": "2026-01-12T14:32:10Z"
+  },
+  "John Doe": {
+    "attendance": true,
+    "detected": false,
+    "firstSeen": "0001-01-01T00:00:00Z",
+    "lastSeen": "0001-01-01T00:00:00Z"
+  }
+}
+```
+
+**Field Descriptions:**
+- `attendance` (boolean): Current attendance status (shown in UI)
+- `detected` (boolean): Whether detected by any result stream
+- `f1. Load Personnel List
+
+- **Endpoint**: `POST /initData`
+- **Description**: Initialize or update the personnel list from a JSON file
+- **Request**: Multipart form data with file field named `jsonFile`
+- **Response**: `{"status": "ok"}`
+
+---
+
+### 2. Fetch Attendance Records
+
+- **Endpoint**: `GET /fetchAttendance`
+- **Description**: Retrieve the current attendance list with detection details and timestamps
 - **Request**: No parameters required
 - **Response**:
-  - Status: `200 OK`
-  - Body:
-    ```js
-    {
-      "Jane Smith" : {
-        "attendance": false, 
-        "detected": false, // not sent from service sending results stream yet (e.g. simpliFRy)
-        "firstSeen": "0001-01-01T00:00:00Z", // first time name appears in results stream
-        "lastSeen": "0001-01-01T00:00:00Z" // last time name appears in results stream
-      }, 
-      "John Doe": {
-        "attendance": true, // manually marked as present
-        "detected": false,
-        "firstSeen": "0001-01-01T00:00:00Z",
-        "lastSeen": "0001-01-01T00:00:00Z"
-      }
+  ```json
+  {
+    "Jane Smith": {
+      "attendance": false,
+      "detected": true,
+      "firstSeen": "2026-01-12T14:30:45Z",
+      "lastSeen": "2026-01-12T14:32:10Z"
+    },
+    "John Doe": {
+      "attendance": true,
+      "detected": false,
+      "firstSeen": "0001-01-01T00:00:00Z",
+      "lastSeen": "0001-01-01T00:00:00Z"
     }
-    ```
+  }
+  ```
+- **Notes**: 
+  - `attendance` is the value shown on the "Records" page
+  - `detected` shows whether the individual has been sent from the results stream
+  - Zero timestamps indicate never detected
+  - Records are saved to `output.json` when this endpoint is called
 
-#### 2. Change Attendance
+---
 
-- **Endpoint**: `/changeAttendance?name={name}`
-- **Method**: `POST`
-- **Description**: Changes `attendance` field of a specified individual (`true` to `false` and vice versa).
-- **Request**: 
-  - `name` (string, required): query parameter specifying name of individual whose boolean value in the `attendance` field will be changed. This must match the string of the person loaded into gotendance exactly.
-- **Response**:
-  - Status: `200 OK`
-  - Body:
-    ```json
-    {
-      "statue": "ok"
-    }
-    ```
+### 3. Get Attendance Summary
 
-#### 3. Get Detected Count
-
-- **Endpoint**: `/getCount`
-- **Method**: `GET`
-- **Description**: Get total number of individuals in the attendance list, and number of detected and attended individuals. 
+- **Endpoint**: `GET /getCount`
+- **Description**: Get total, detected, and attended counts
 - **Request**: No parameters required
 - **Response**:
-  - Status: `200 OK`
-  - Body:
-    ```js
-    {
-      "total": 10, // total number of individuals in attendance list
-      "detected": 5, // number of individuals sent from the results stream of another service
-      "attended": 5, // number of individuals considered "present" in the /records page
-    }
-    ```
+  ```json
+  {
+    "total": 10,
+    "detected": 5,
+    "attended": 7
+  }
+  ```
+
+---
+
+### 4. Start Listening to Stream
+
+- **Endpoint**: `POST /startCollate`
+- **Description**: Add a new result stream URL for gotendance to monitor
+- **Request**: Form data with `frUrl` (string) and `updateInterval` (float, in seconds)
+- **Response**: `{"status": "ok"}`
+- **Notes**: URL is tested before adding; duplicate URLs are ignored
+
+---
+
+### 5. Stop Listening to Stream
+
+- **Endpoint**: `POST /stopCollate?frUrl={url}`
+- **Description**: Remove a result stream and stop monitoring it
+- **Request**: Query parameter `frUrl` (string, required)
+- **Response**: `{"status": "ok"}`
+
+---
+
+### 6. List Active Streams
+
+- **Endpoint**: `GET /getStreamsList`
+- **Description**: Get list of all currently monitored result streams
+- **Request**: No parameters required
+- **Response**:
+  ```json
+  [
+    {"url": "http://192.168.1.100:5000/frResults"},
+    {"url": "http://192.168.1.101:5000/frResults"}
+  ]
+  ```
+
+---
+
+### 7. Toggle Attendance Status
+
+- **Endpoint**: `POST /changeAttendance?name={name}`
+- **Description**: Manually toggle the attendance status for a specific individual
+- **Request**: Query parameter `name` (string, required, must match exactly)
+- **Response**: `{"status": "ok"}`
+
+---
+
+### 8. Reset All Attendance
+
+- **Endpoint**: `POST /resetAttendance`
+- **Description**: Reset all attendance records to absent and clear all detection data
+- **Request**: No parameters required
+- **Response**: `{"status": "ok"}`
+- **Notes**: Does not affect active stream connec

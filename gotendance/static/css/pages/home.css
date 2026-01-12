@@ -21,6 +21,37 @@
     color: rgb(150, 50, 50);
 }
 
-/* .icon-tablet-trash:hover {
-    color: rgb(134, 24, 5);
-} */
+.upload-status {
+    display: block;
+    margin: 1em auto 0;
+    padding: 0.5em 0.75em;
+    border-radius: 0.5em;
+    background-color: #27ae60;
+    color: white;
+    font-size: 0.9em;
+    font-weight: 500;
+    width: fit-content;
+    white-space: nowrap;
+}
+
+.upload-status.error {
+    background-color: #e74c3c;
+}
+
+.reset-button {
+    display: block;
+    margin: 0.5em auto 0;
+    padding: 0.6em 1.2em;
+    border-radius: 0.5em;
+    background-color: #e74c3c;
+    color: white;
+    font-size: 0.95em;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.reset-button:hover {
+    background-color: #c0392b;
+}

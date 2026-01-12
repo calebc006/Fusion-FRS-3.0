@@ -117,6 +117,19 @@ func stopCollateHandler(streamsList *collator.StreamsList) http.HandlerFunc {
 	}
 }
 
+func resetAttendanceHandler(store *collator.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		store.ResetAllAttendance()
+
+		response := generateOKRes()
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Error encoding JSON response", http.StatusInternalServerError)
+		}
+	}
+}
+
 func fetchHandler(store *collator.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -204,6 +217,27 @@ func enforceGet(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func getStreamsListHandler(streamsList *collator.StreamsList) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		streamsListCopy := streamsList.FetchList()
+		
+		// Create a simple response struct without channels
+		type StreamInfo struct {
+			Url string `json:"url"`
+		}
+		
+		streamInfos := make([]StreamInfo, len(streamsListCopy))
+		for i, stream := range streamsListCopy {
+			streamInfos[i] = StreamInfo{Url: stream.Url}
+		}
+		
+		if err := json.NewEncoder(w).Encode(streamInfos); err != nil {
+			http.Error(w, "Error encoding JSON response", http.StatusInternalServerError)
+		}
+	}
+}
+
 func main() {
 	log.Printf("Initialising...\n")
 
@@ -212,9 +246,11 @@ func main() {
 	store.LoadPrevOutput(recordFilename)
 
 	http.HandleFunc("/initData", loadData(store))
+	http.HandleFunc("/resetAttendance", resetAttendanceHandler(store))
 
 	http.HandleFunc("/startCollate", startCollateHandler(store, streamsList))
 	http.HandleFunc("/stopCollate", stopCollateHandler(streamsList))
+	http.HandleFunc("/getStreamsList", getStreamsListHandler(streamsList))
 
 	http.HandleFunc("/changeAttendance", changeAttendanceHandler(store))
 	http.HandleFunc("/fetchAttendance", fetchHandler(store))

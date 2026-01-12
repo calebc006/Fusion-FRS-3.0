@@ -84,7 +84,11 @@ func (streamsList *StreamsList) FetchList() []StreamSrc {
 
 
 func handleResult(result []Detection, store *Store) {
+	// if len(result) > 0 {
+	// 	log.Printf("Processing %d detections", len(result))
+	// }
 	for _, detection := range result {
+		log.Printf("Detected: %s (score: %.2f)", detection.Label, detection.Score)
 		store.Check(detection.Label)
 	}
 }

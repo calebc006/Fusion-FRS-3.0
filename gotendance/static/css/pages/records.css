@@ -146,6 +146,7 @@ button{
     border-radius: 10px;
     overflow: hidden;
     color: white;
+    table-layout: fixed;
 }
 
 .recordsTable thead tr {
@@ -160,6 +161,16 @@ button{
 .recordsTable td {
     padding: 15px 20px;
     text-align: center;
+}
+
+.recordsTable th:first-child,
+.recordsTable td:first-child {
+    width: 70%;
+}
+
+.recordsTable th:last-child,
+.recordsTable td:last-child {
+    width: 30%;
 }
 
 .recordsTable tbody tr {
@@ -206,19 +217,20 @@ button{
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     text-align: center;
-    width: 30%;
+    width: 50%;
     margin-left: auto;
     margin-right: auto;
     display: flex;
     flex-direction: row;
     justify-content: space-evenly;
+    gap: 20px;
+    align-items: center;
     color:white;
 }
 .attendance {
     font-size: 24px;
     font-weight: bold;
-    margin-bottom: 10px;
-    
+    text-align: center;
 
 }
 .percentage {
@@ -227,24 +239,139 @@ button{
     transition: color 0.5s ease;
 }
 
-.filter-buttons {
+.filter-container {
     display: flex;
     gap: 10px;
-    margin-top: 10px;
     justify-content: center;
     align-items: center;
+}
+
+.filter-container label {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.filter-container select {
+    background-color: #2c3e50;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.filter-container select:hover {
+    background-color: #34495e;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.filter-container select:focus {
+    outline: none;
+    background-color: #34495e;
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2);
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .filter-buttons button {
     background-color: #2c3e50;
     color: white;
     border: none;
-    padding: 8px 15px;
+    padding: 10px 18px;
     border-radius: 5px;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
 .filter-buttons button:hover {
     background-color: #34495e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.filter-buttons button.active {
+    background-color: hsl(155, 100%, 50%);
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.4);
+}
+
+.tag-filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 10px 0;
+    border-top: 1px solid #444;
+    border-bottom: 1px solid #444;
+}
+
+.tag-filter-buttons button {
+    background-color: #2c3e50;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.tag-filter-buttons button:hover {
+    background-color: #34495e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.tag-filter-buttons button.active {
+    background-color: hsl(158, 43%, 29%);
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.4);
+}
+
+.tag-filter-buttons button.select-all-btn {
+    background-color: #34495eaf;
+    margin-right: 10px;
+}
+
+.tag-filter-buttons button.select-all-btn:hover {
+    background-color: #229954;
+}
+
+.tag-filter-buttons button.select-all-btn.active {
+    background-color: #27ae60;
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
+}
+
+.reset-button {
+    display: block;
+    margin: 1em auto 0;
+    padding: 0.6em 1.2em;
+    border-radius: 0.5em;
+    background-color: #e74c3c;
+    color: white;
+    font-size: 0.95em;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.reset-button:hover {
+    background-color: #c0392b;
 }

@@ -10,11 +10,13 @@ import (
 )
 
 type Record struct {
-	Attendance bool      `json:"attendance"`
-	Detected   bool      `json:"detected"`
-	FirstSeen  time.Time `json:"firstSeen"`
-	LastSeen   time.Time `json:"lastSeen"`
-	ReferenceID string   `json:"referenceid"`
+	Name        string    `json:"name"`
+	Attendance  bool      `json:"attendance"`
+	Detected    bool      `json:"detected"`
+	FirstSeen   time.Time `json:"firstSeen"`
+	LastSeen    time.Time `json:"lastSeen"`
+	ReferenceID string    `json:"referenceid"`
+	Tags        []string  `json:"tags"`
 }
 
 type Store struct {
@@ -25,6 +27,7 @@ type Store struct {
 type Person struct {
 	Name   string   `json:"name"`
 	Images []string `json:"images"`
+	Tags   []string `json:"tags"`
 }
 
 type JsonStruct struct {
@@ -52,10 +55,10 @@ func (store *Store) Check(name string) {
 	if exists {
 		record.Detected = true
 		record.LastSeen = currTime
-
-		if record.FirstSeen.IsZero() {
+		record.Attendance = true
+		
+		if record.FirstSeen.IsZero() { // never seen before!0
 			record.FirstSeen = currTime
-			record.Attendance = true
 			log.Printf("%s present!", name)
 		}
 
@@ -70,6 +73,19 @@ func (store *Store) Mark(name string) {
 	record, exists := store.Items[name]
 	if exists {
 		record.Attendance = !record.Attendance
+		store.Items[name] = record
+	}
+}
+
+func (store *Store) ResetAllAttendance() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	for name, record := range store.Items {
+		record.Attendance = false
+		record.Detected = false
+		record.FirstSeen = time.Time{}
+		record.LastSeen = time.Time{}
 		store.Items[name] = record
 	}
 }
@@ -106,6 +122,7 @@ func (store *Store) Add(name string) {
 	var initRecord Record
 	initRecord.Detected = false
 	initRecord.Attendance = false
+	initRecord.Tags = []string{} // Initialize as empty slice instead of nil
 
 	store.Items[name] = initRecord
 }
@@ -149,21 +166,45 @@ func (store *Store) LoadJSON(bytes []byte) error {
 		return err
 	}
 
-	// Clear the store
-	store.Clear()
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	// Store old record data
+	oldRecords := make(map[string]Record)
+	for name, record := range store.Items {
+		oldRecords[name] = record
+	}
+
+	// Clear and reload personnel from the new JSON
+	store.Items = make(map[string]Record)
 
 	// Loop through the details (person) from the uploaded JSON
 	for _, person := range jsonData.Details {
-		// Add the person to the store with an initial Record
-		store.Add(person.Name)
+		record := Record{
+			Name:       person.Name,
+			Tags:       person.Tags,
+		}
+
+		// Preserve attendance, detected, and timestamps from previous session if person still exists
+		if oldRecord, exists := oldRecords[person.Name]; exists {
+			record.Attendance = oldRecord.Attendance
+			record.Detected = oldRecord.Detected
+			record.FirstSeen = oldRecord.FirstSeen
+			record.LastSeen = oldRecord.LastSeen
+		} else {
+			record.Attendance = false
+			record.Detected = false
+			record.FirstSeen = time.Time{}
+			record.LastSeen = time.Time{}
+		}
 
 		// If there are images, set the first image as the ReferenceID
 		if len(person.Images) > 0 {
-			record := store.Items[person.Name] // Get the record by name
 			// Remove ".png" extension from the ReferenceID
 			record.ReferenceID = strings.TrimSuffix(person.Images[0], ".png")
-			store.Items[person.Name] = record    // Update the record in the store
 		}
+
+		store.Items[person.Name] = record
 	}
 
 	return nil
@@ -190,6 +231,14 @@ func (store *Store) LoadPrevOutput(filename string) {
 	if err := decoder.Decode(&store.Items); err != nil {
 		log.Printf("Error decoding JSON: %v", err)
 		return
+	}
+
+	// Convert nil tags to empty slices
+	for name, record := range store.Items {
+		if record.Tags == nil {
+			record.Tags = []string{}
+			store.Items[name] = record
+		}
 	}
 
 	log.Printf("Loaded data from previous session")
