@@ -1,1 +1,1 @@
-{"threshold": 0.45, "holding_time": 1.5, "use_differentiator": false, "threshold_lenient_diff": 0.55, "similarity_gap": 0.1, "use_persistor": true, "threshold_prev": 0.3, "threshold_iou": 0.2, "threshold_lenient_pers": 0.6}
+{"threshold": 0.4, "holding_time": 1.5, "use_brute_force": true, "perf_logging": true, "use_differentiator": true, "threshold_lenient_diff": 0.55, "similarity_gap": 0.1, "use_persistor": true, "threshold_prev": 0.2, "threshold_iou": 0.2, "threshold_lenient_pers": 0.6}

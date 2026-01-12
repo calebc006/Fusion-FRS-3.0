@@ -21,6 +21,8 @@ class VideoPlayer:
         # For modifiables
         self.vid_lock = threading.Lock()
         self.frame_bytes = b"" 
+        self.frame_id = 0 # Counter to track new frames
+        self.perf_logging = False
         self.ffmpeg_process = None
         self.streamThread = None
         self.inferenceThread = None
@@ -72,7 +74,7 @@ class VideoPlayer:
             "-i", stream_src.strip(),
 
             # Video processing
-            "-vf", f"scale={self.width}:{self.height}",
+            "-vf", f"fps=25, scale={self.width}:{self.height}",
             "-an",
             "-sn",
 
@@ -134,6 +136,11 @@ class VideoPlayer:
         frames_processed = 0
         last_data_time = None  # Will be set when we first receive data
 
+        # Perf logging
+        perf_interval_s = 5.0
+        last_perf_log = time.monotonic()
+        last_frames_processed = 0
+
         # MAIN READ LOOP
         while not self.end_event.is_set():
             # Check if process has terminated
@@ -183,10 +190,19 @@ class VideoPlayer:
 
                 with self.vid_lock:
                     self.frame_bytes = frame_bytes
+                    self.frame_id += 1
 
                 frames_processed += 1
                 if frames_processed == 1:
                     log_info("Successfully processed first RGB frame from FFmpeg stream")
+
+                now = time.monotonic()
+                if self.perf_logging and (now - last_perf_log) >= perf_interval_s:
+                    frames_delta = frames_processed - last_frames_processed
+                    fps = frames_delta / max(now - last_perf_log, 1e-9)
+                    log_info(f"Stream perf: fps_in={fps:.1f}, total_frames={frames_processed}")
+                    last_perf_log = now
+                    last_frames_processed = frames_processed
 
         else:
             self._handle_stream_end()
@@ -257,7 +273,7 @@ class VideoPlayer:
         return None
     
     def end_stream(self) -> None:
-        """Ends ffmpeg video stream"""\
+        """Ends ffmpeg video stream"""
         
         self.end_event.set()
         self._stop_ffmpeg()
@@ -281,9 +297,15 @@ class VideoPlayer:
         - Generator yielding video frames proccessed from ffmpeg
         """
 
-        while self.streamThread.is_alive():
+        frame_size = self.width * self.height * 3
+
+        while self.streamThread is not None and self.streamThread.is_alive():
             with self.vid_lock:
                 frame_bytes = self.frame_bytes
+
+            if not frame_bytes or len(frame_bytes) != frame_size:
+                time.sleep(0.01)
+                continue
 
             frame = np.frombuffer(frame_bytes, np.uint8).reshape(
                 (self.height, self.width, 3)

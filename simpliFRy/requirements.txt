@@ -14,4 +14,4 @@ opencv-python==4.9.0.80
 opencv-python-headless==4.9.0.80
 onnxruntime-gpu==1.18.1
 torch==2.1.2+cu118
-torchvision
+torchvision==0.16.2+cu118

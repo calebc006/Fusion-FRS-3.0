@@ -134,6 +134,8 @@ def submit():
         "holding_time": float(
             request.form.get("holding_time", fr_instance.fr_settings["holding_time"]))
         ,
+        "use_brute_force": "use_brute_force" in request.form,
+        "perf_logging": "perf_logging" in request.form,
         "use_differentiator": "use_differentiator" in request.form,
         "threshold_lenient_diff": float(request.form.get(
             "threshold_lenient_diff", fr_instance.fr_settings["threshold_lenient_diff"]
@@ -194,6 +196,8 @@ def settings():
         "settings.html",
         threshold=fr_instance.fr_settings["threshold"],
         holding_time=fr_instance.fr_settings["holding_time"],
+        use_brute_force=fr_instance.fr_settings["use_brute_force"],
+        perf_logging=fr_instance.fr_settings.get("perf_logging", False),
         use_differentiator=fr_instance.fr_settings["use_differentiator"],
         threshold_lenient_diff=fr_instance.fr_settings["threshold_lenient_diff"],
         similarity_gap=fr_instance.fr_settings["similarity_gap"],

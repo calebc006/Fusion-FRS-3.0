@@ -1,21 +1,20 @@
 # SimpliFRy
 
-![Project Logo](static/favicon.png)
+![Project Logo](static/images/favicon.png)
 
 ---
 
 ## Table of Contents
 
 - [Description](#description)
-- [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-
+- [Pages](#pages)
 ---
 
 ## Description
 
-**SimpliFRy** is the core component of [Real-time FRS 2.0](https://github.com/CJBuzz/Real-time-FRS-2.0) and is the software that handles Real-time Facial Recognition. It is a locally-hosted web application built using python 3.10 and [Flask](https://github.com/pallets/flask), and makes use of the [insightface](https://github.com/deepinsight/insightface) library by deepinsight for face detection and generation of embeddings as well as the [voyager](https://github.com/spotify/voyager) library by Spotify for K-Nearest Neighbour search.
+**SimpliFRy** is the core component of [Real-time FRS 2.0](https://github.com/CJBuzz/Real-time-FRS-2.0) (the other being [gotendance](https://github.com/Cooleststar/FUSION-FR/tree/main/gotendance)). It is a locally-hosted web application built using python 3.10 and [Flask](https://github.com/pallets/flask), and makes use of the [insightface](https://github.com/deepinsight/insightface) library by deepinsight for face detection and generation of embeddings as well as the [voyager](https://github.com/spotify/voyager) library by Spotify for K-Nearest Neighbour search.
 
 If you are a developer and would like to understand more about how simpliFRy works, refer to the [Developer Guide](Developer%20Guide.md)
 
@@ -67,7 +66,7 @@ py -m venv venv
 Activate it
 
 ```bash
-venv\Scripts\activate # on windows, use source venv/bin/activate for linux and macOS
+venv\Scripts\activate # use source venv/bin/activate for linux and macOS
 ```
 
 Install the requirements with pip
@@ -86,13 +85,7 @@ pip install -r requirements.txt
 
 2. Run the container
 
-If you wish to create a new container, run the following command
-
-```bash
-docker run -p 1333:1333 -v "C:\Users\Admin\Desktop\FUSION-FR\simpliFRy\data:/app/data" --gpus all simplifry-simplifry
-```
-
-Alternatively, you can run docker compose from the `simpliFRy` directory
+If you wish to create a new container, run the following command from the `simpliFRy` directory
 
 ```bash
 docker compose up --no-build
@@ -104,20 +97,18 @@ If you want to run multiple containers, run one container at with the port argum
 
 This means the 2nd container can be accessed at <http://127.0.0.1:2000>.
 
-Alternatively, you can edit `docker-compose.yml` and run
-
-```bash
-docker compose up --no-build
-```
 
 If you already have an existing container, you can simply start it from the Docker Desktop application.
 
 ### Without Docker (for development)
 
-Run the `app.py` script in the simpliFRy virtual environment
+Activate the Python virtual environment and run the `app.py` script 
 
 ```bash
-py app.py
+venv\Scripts\activate # use source venv/bin/activate for linux and macOS
+```
+```bash
+python3 app.py
 ```
 
 ### Data Preparation
@@ -126,36 +117,7 @@ To conduct facial recognition, you need to load images of people you wish to be 
 
 1. From the `simpliFRy/data` folder (created automatically when starting the app), create a new directory with all the images of the people you wish to be detected.
 
-2. In the `simpliFRy/data` folder, create a JSON file (name it whatever you want) that maps the image file name with the name of the person to be recognised. Format it as shown below:
-
-```json
-// example.json
-{
-  "img_folder_path": "path/to/image/folder",
-  "flag_folder_path": "path/to/flag/folder",
-  "details": [
-    {
-      "name": "Person One",
-      "images": ["image1.jpg", "image2.png"],
-      "country_flag": "singapore_flag.png",
-      "description": "Chief of Army, Redland Armed Forces",
-      "table": "T1"
-    },
-    {
-      "name": "Person Two",
-      "images": ["image3.jpg", "image4.png"],
-      "country_flag": "brunei_flag.png",
-      "description": "Janitor",
-      "table": "T2"
-    }
-    // Other similar entries as above
-  ]
-}
-```
-
-`img_folder_path` will the path to the folder with all the faces relative to `/data`
-`flag_folder_path` will the path to the folder with all the country flags relative to `/data`
-
+2. In the `simpliFRy/data` folder, create a JSON file (name it whatever you want) that maps the image file name with the name of the person to be recognised. 
 
 For example, if `john_doe1.jpg` and `john_doe2.png` are pictures of 'John Doe' while `jane_smith.png` is a picture of 'Jane Smith', and all images are in a folder called `pictures`, this is the directory structure. 
 
@@ -168,7 +130,7 @@ simpliFRy/
 |   ├── pictures/
 |   |   ├── john_doe1.jpg
 |   |   ├── john_doe2.png
-|   |   └── jane_smith.png
+|   |   └── caleb.png
 |   └── namelist.json
 └── other files and folders
 ```
@@ -185,34 +147,32 @@ simpliFRy/
       "images": ["john_doe1.jpg", "john_doe2.png"],
       "country_flag": "singapore_flag.png",
       "description": "someone",
-      "table": "T1"
+      "table": "T1",
+      "tags": ["Army", "DIS"]
     },
     {
-      "name": "Jane Smith",
-      "images": ["jane_smith.png"],
+      "name": "3SG CALEB CHIA",
+      "images": ["caleb.png"],
       "country_flag": "singapore_flag.png",
       "description": "someone else",
-      "table": "T2"
+      "table": "VIP",
+      "tags": ["Air Force"]
     }
   ]
 }
 ```
 
-**The fields `flag_folder_path`, `country_flag`, `description` and `table` can be omitted if the deployment does not require these information.**
+- `img_folder_path` will the path to the folder with all the faces relative to `/data`
+
+- `flag_folder_path` will the path to the folder with all the country flags relative to `/data`
+
+- **The fields `flag_folder_path`, `country_flag`, `description`, `table`, `tags` can be omitted if the deployment does not require these information. However this must be consistent throughout the JSON file.**
 
 ### `/data` Directory
 
-The `data` directory in `simpliFRy` is a **volume mount** as it is volume mounted to the `/app/data` directory within the docker container. Hence, it is the primary way to pass information to (e.g. folder of images, refer to [Data Preparation](#data-preparation) for more info) and from (logs) the container.
+The `data` directory in `simpliFRy` is a **volume mount** as it is volume mounted to the `/app/data` directory within the docker container. Hence, it is the primary way to pass information to and from the container.
 
 Everytime the app is started, a new `.logs` file will be created in the `/data/logs` directory. It will list key actions undertaken by the simpliFRy app (and any error messages) in that session.
-
-## Pages
-
-The pages in this application are:
-- `localhost:1333`
-- `localhost:1333/seats`
-- `localhost:1333/old_layout`
-- `localhost:1333/settings`
 
 ### `.env` file
 
@@ -224,6 +184,16 @@ APP_PORT = 1333
 APP_VIDEO = true
 APP_ENV = production
 ```
+
+## Pages
+
+The pages in this application are:
+- `localhost:1333`
+- `localhost:1333/seats`
+- `localhost:1333/old_layout`
+- `localhost:1333/settings`
+
+
 
 ### Settings
 

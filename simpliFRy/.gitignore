@@ -167,3 +167,7 @@ dev-assets/
 
 # Data
 data/
+
+# Embeddings cache and database
+Embeddings.db
+embeddings_cache.json

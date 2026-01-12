@@ -6,7 +6,7 @@
     <title>FR Settings</title>
     <link rel="icon" href="../static/images/favicon.png" />
     <link rel="stylesheet" type="text/css" href="../static/css/main.css" />
-    <link rel="stylesheet" type="text/css" href="../static/css/form.css" />
+    <link rel="stylesheet" type="text/css" href="../static/css/settings.css" />
     <link rel="stylesheet" type="text/css" href="../static/css/taskbar.css" />
   </head>
   <body>
@@ -40,7 +40,38 @@
           step="0.1"
           required
         />
+        <div class="break"></div>
         <!-- Time (in seconds) for which a name would be displayed after last recognition  -->
+
+        <label for="use_brute_force">Use Brute Force Search</label>
+        <input
+          type="checkbox"
+          id="use_brute_force"
+          name="use_brute_force"
+          {%
+          if
+          use_brute_force
+          %}checked{%
+          endif
+          %}
+        />
+        <!-- Toggle between brute force (exact, slower) and Voyager (fast ANN) search -->
+
+        <div class="break"></div>
+
+        <label for="perf_logging">Enable Performance Logging</label>
+        <input
+          type="checkbox"
+          id="perf_logging"
+          name="perf_logging"
+          {%
+          if
+          perf_logging
+          %}checked{%
+          endif
+          %}
+        />
+        <!-- Logs stream/inference/search timing periodically to data/logs -->
       </fieldset>
 
       <fieldset class="form-section">

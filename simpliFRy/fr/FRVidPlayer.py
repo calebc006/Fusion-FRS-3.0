@@ -4,6 +4,8 @@ import os
 import io
 import threading
 import traceback
+import hashlib
+import warnings
 from datetime import datetime, timedelta
 from typing import Generator, TypedDict
 import subprocess
@@ -28,6 +30,7 @@ def is_cuda_available():
 
 
 FR_SETTINGS_FP = 'settings.json'
+EMBEDDINGS_CACHE_FP = 'embeddings_cache.json'
 
 
 class FRResult(TypedDict):
@@ -52,6 +55,8 @@ class FRSettings(TypedDict):
 
     threshold: float
     holding_time: int
+    use_brute_force: bool
+    perf_logging: bool
     use_differentiator: bool
     threshold_lenient_diff: float
     similarity_gap: float
@@ -71,6 +76,22 @@ class FRVidPlayer(VideoPlayer):
 
         super().__init__()
 
+        # Reduce noise from upstream dependencies (does not affect behavior)
+        warnings.filterwarnings(
+            "ignore",
+            category=FutureWarning,
+            module=r"insightface\.utils\.transform",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=FutureWarning,
+            module=r"insightface\.utils\.face_align",
+        )
+
+        # Last-call timing (seconds) for logging
+        self._last_search_time_s = 0.0
+        self._last_search_backend = "none"
+
         provider = "CUDAExecutionProvider" if is_cuda_available() else "CPUExecutionProvider"
 
         # For FR algorithm
@@ -79,6 +100,8 @@ class FRVidPlayer(VideoPlayer):
 
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
         self.name_list = []
+        self.embeddings_array = np.array([])  # For brute force search
+        self.db_norms = np.array([]) # Pre-computed norms for brute force search
 
         self.recent_detections: list[RecentDetection] = []
 
@@ -94,6 +117,8 @@ class FRVidPlayer(VideoPlayer):
         self.fr_settings: FRSettings = {
             "threshold": fr_settings.get("threshold", 0.45),
             "holding_time": fr_settings.get("holding_time", 3),
+            "use_brute_force": fr_settings.get("use_brute_force", False),
+            "perf_logging": fr_settings.get("perf_logging", False),
             "use_differentiator": fr_settings.get("use_differentiator", True),
             "threshold_lenient_diff": fr_settings.get("threshold_lenient_diff", 0.55),
             "similarity_gap": fr_settings.get("similarity_gap", 0.10),
@@ -110,9 +135,63 @@ class FRVidPlayer(VideoPlayer):
         self.inference_lock = threading.Lock()
         self.fr_results = []
 
+        # Mirror FR setting onto base class (used by VideoPlayer stream perf logs)
+        self.perf_logging = bool(self.fr_settings.get("perf_logging", False))
+
         log_info("FR Model initialised!")
 
         pass
+
+    def _compute_file_hash(self, filepath: str) -> str:
+        """Compute SHA256 hash of a file"""
+        sha256_hash = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    def _load_cache_info(self) -> dict:
+        """Load embedding cache information"""
+        if os.path.exists(EMBEDDINGS_CACHE_FP):
+            with open(EMBEDDINGS_CACHE_FP, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def _save_cache_info(self, data_file: str, file_hash: str) -> None:
+        """Save embedding cache information"""
+        cache_info = {
+            "data_file": data_file,
+            "file_hash": file_hash,
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(EMBEDDINGS_CACHE_FP, 'w') as f:
+            json.dump(cache_info, f, indent=2)
+
+    def _should_regenerate_embeddings(self, data_file: str) -> bool:
+        """
+        Check if embeddings need to be regenerated
+        
+        Returns True if embeddings should be regenerated, False if cached embeddings can be used
+        """
+        data_file_path = os.path.join('data', data_file)
+        
+        # Compute current file hash
+        current_hash = self._compute_file_hash(data_file_path)
+        
+        # Load cache info
+        cache_info = self._load_cache_info()
+        
+        # Check if we have valid cache
+        if cache_info.get("data_file") == data_file and cache_info.get("file_hash") == current_hash:
+            # Check if database has embeddings
+            with get_db() as conn:
+                records = fetch_records(conn)
+                if len(records) > 0:
+                    log_info(f"Using cached embeddings (file hash matches: {current_hash[:8]}...)")
+                    return False
+        
+        log_info(f"Regenerating embeddings (file changed or no cache)")
+        return True
 
     def load_embeddings(self, data_file: str | None) -> None:
         """
@@ -125,7 +204,11 @@ class FRVidPlayer(VideoPlayer):
         if not data_file:
             self._fetch_embeddings()
         else:
-            self._form_embeddings(data_file.strip())
+            data_file = data_file.strip()
+            if self._should_regenerate_embeddings(data_file):
+                self._form_embeddings(data_file)
+            else:
+                self._fetch_embeddings()
 
     def adjust_values(self, new_settings: FRSettings) -> FRSettings:
         """
@@ -139,6 +222,9 @@ class FRVidPlayer(VideoPlayer):
         """
 
         self.fr_settings = new_settings
+
+        # Keep stream/infer logging in sync with settings
+        self.perf_logging = bool(new_settings.get("perf_logging", False))
 
         with open(FR_SETTINGS_FP, 'w') as file:
             json.dump(new_settings, file)
@@ -182,10 +268,12 @@ class FRVidPlayer(VideoPlayer):
         return sum(embedding_list) / len(embedding_list)
 
     def _reset_vector_index(self) -> None:
-        """Reset vector index and name list"""
+        """Reset vector index, embeddings array, and name list"""
 
         self.name_list = []
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
+        self.embeddings_array = np.array([])
+        self.db_norms = np.array([])
 
     def _fetch_embeddings(self) -> None:
         """Load embeddings from SQLite database"""
@@ -199,9 +287,17 @@ class FRVidPlayer(VideoPlayer):
         with get_db() as conn:
             records = fetch_records(conn)
 
+        embeddings_list = []
         for record in records:
             self.name_list.append(record["name"])
             self.vector_index.add_item(record["ave_embedding"])
+            embeddings_list.append(record["ave_embedding"])
+        
+        if embeddings_list:
+            self.embeddings_array = np.array(embeddings_list)
+            # Pre-compute norms
+            self.db_norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
+            self.db_norms[self.db_norms == 0] = 1
 
         log_info(f"Loaded {len(self.name_list)} embeddings from db")       
 
@@ -230,6 +326,7 @@ class FRVidPlayer(VideoPlayer):
             recreate_table(conn)
             log_info("Extracting embeddings from images...")
             self._reset_vector_index()
+            embeddings_list = []
             for entry in tqdm(data_dict["details"]):
                 name = entry["name"]
                 ave_embedding = self._extract_ave_embedding(
@@ -243,6 +340,65 @@ class FRVidPlayer(VideoPlayer):
 
                 self.name_list.append(name)
                 self.vector_index.add_item(ave_embedding)
+                embeddings_list.append(ave_embedding)
+            
+            if embeddings_list:
+                self.embeddings_array = np.array(embeddings_list)
+                # Pre-compute norms for brute-force search
+                self.db_norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
+                self.db_norms[self.db_norms == 0] = 1
+        
+        # Save cache info after successful generation
+        data_file_path = os.path.join('data', data_file)
+        file_hash = self._compute_file_hash(data_file_path)
+        self._save_cache_info(data_file, file_hash)
+
+    def _brute_force_search(self, query_embeddings: list[np.ndarray], k: int) -> tuple[list[list[int]], list[list[float]]]:
+        """
+        Perform brute force cosine distance search
+        
+        Arguments
+        - query_embeddings: list of query embedding vectors
+        - k: number of nearest neighbors to return
+        
+        Returns
+        - tuple of (neighbours indices, distances)
+        """
+        if self.embeddings_array.size == 0:
+            return [], []
+        
+        neighbours = []
+        distances = []
+        
+        # Use pre-computed norms
+        if self.db_norms.size == 0 and self.embeddings_array.size > 0:
+             # Fallback if somehow not computed (safety)
+            self.db_norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
+            self.db_norms[self.db_norms == 0] = 1
+
+        db_embeddings_normalized = self.embeddings_array / self.db_norms
+        
+        for query_embed in query_embeddings:
+            # Normalize query embedding
+            query_norm = np.linalg.norm(query_embed)
+            if query_norm == 0:
+                query_norm = 1
+            query_normalized = query_embed / query_norm
+            
+            # Compute cosine similarities
+            cosine_similarities = np.dot(db_embeddings_normalized, query_normalized)
+            
+            # Convert to cosine distances (1 - similarity)
+            cosine_distances = 1 - cosine_similarities
+            
+            # Get k nearest neighbors (smallest distances)
+            nearest_indices = np.argsort(cosine_distances)[:k]
+            nearest_distances = cosine_distances[nearest_indices]
+            
+            neighbours.append(nearest_indices.tolist())
+            distances.append(nearest_distances.tolist())
+        
+        return neighbours, distances
 
     @staticmethod
     def _fractionalise_bbox(
@@ -403,9 +559,20 @@ class FRVidPlayer(VideoPlayer):
                 extra_labels = self._update_recent_detections([])
                 return [{"label": label} for label in extra_labels]
 
-            neighbours, distances = self.vector_index.query(
-                embeddings_list, k=min(2, len(self.name_list))
-            )
+            # Use brute force or Voyager search based on settings
+            t_search0 = time.monotonic() if self.fr_settings.get("perf_logging", False) else None
+            if self.fr_settings["use_brute_force"]:
+                neighbours, distances = self._brute_force_search(
+                    embeddings_list, k=min(2, len(self.name_list))
+                )
+                self._last_search_backend = "brute"
+            else:
+                neighbours, distances = self.vector_index.query(
+                    embeddings_list, k=min(2, len(self.name_list))
+                )
+                self._last_search_backend = "voyager"
+            if t_search0 is not None:
+                self._last_search_time_s = time.monotonic() - t_search0
         except Exception as e:
             log_info(f"Error in infer method: {e}")
             log_info(traceback.format_exc())
@@ -464,13 +631,64 @@ class FRVidPlayer(VideoPlayer):
     def _loopInference(self) -> None:
         """Repeatedly conducts inference on the latest frame from the ffmpeg video stream"""
 
+        last_processed_id = -1
+
+        # Perf logging
+        perf_interval_s = 5.0
+        last_perf_log = time.monotonic()
+        infer_calls = 0
+        infer_time_s_sum = 0.0
+        search_time_s_sum = 0.0
+        search_calls = 0
+        skipped_same_frame = 0
+
         while self.streamThread.is_alive() and not self.end_event.is_set():
             try:
                 with self.vid_lock:
+                    current_id = self.frame_id
                     frame_bytes = self.frame_bytes
-                results = self.infer(frame_bytes)
+                
+                # Skip if we've already processed this frame
+                if current_id == last_processed_id:
+                    skipped_same_frame += 1
+                    time.sleep(0.001) # Short cool-down
+                    continue
+                
+                last_processed_id = current_id
+
+                if self.fr_settings.get("perf_logging", False):
+                    t0 = time.monotonic()
+                    results = self.infer(frame_bytes)
+                    infer_time_s_sum += (time.monotonic() - t0)
+                    infer_calls += 1
+
+                    search_time_s_sum += float(getattr(self, "_last_search_time_s", 0.0))
+                    search_calls += 1
+                else:
+                    results = self.infer(frame_bytes)
+
                 with self.inference_lock:
                     self.fr_results = results
+
+                now = time.monotonic()
+                if self.fr_settings.get("perf_logging", False) and (now - last_perf_log) >= perf_interval_s:
+                    interval = max(now - last_perf_log, 1e-9)
+                    fps_infer = infer_calls / interval
+                    avg_ms = (infer_time_s_sum / max(infer_calls, 1)) * 1000.0
+                    avg_search_ms = (search_time_s_sum / max(search_calls, 1)) * 1000.0
+                    backend = getattr(self, "_last_search_backend", "unknown")
+                    log_info(
+                        "Infer perf: "
+                        f"fps_infer={fps_infer:.1f}, avg_infer_ms={avg_ms:.1f}, "
+                        f"avg_search_ms={avg_search_ms:.2f} ({backend}), "
+                        f"skipped_same_frame={skipped_same_frame}"
+                    )
+                    last_perf_log = now
+                    infer_calls = 0
+                    infer_time_s_sum = 0.0
+                    search_time_s_sum = 0.0
+                    search_calls = 0
+                    skipped_same_frame = 0
             except Exception as e:
                 log_info(f"Error in inference loop: {e}")
                 log_info(traceback.format_exc())
@@ -496,7 +714,7 @@ class FRVidPlayer(VideoPlayer):
         - Generator yielding FR detection results (list of typed dictionary)
         """
 
-        while hasattr(self, 'inferenceThread') and self.inferenceThread.is_alive():
+        while self.inferenceThread is not None and self.inferenceThread.is_alive():
             try:
                 with self.inference_lock:
                     yield json.dumps({"data": self.fr_results}) + '\n'
