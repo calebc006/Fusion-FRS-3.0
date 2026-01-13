@@ -152,6 +152,9 @@ def submit():
         )),
         "threshold_lenient_pers": float(request.form.get(
             "threshold_lenient_pers", fr_instance.fr_settings["threshold_lenient_pers"]
+        )),
+        "frame_skip": int(request.form.get(
+            "frame_skip", fr_instance.fr_settings.get("frame_skip", 1)
         ))
     }
 
@@ -205,6 +208,7 @@ def settings():
         threshold_prev=fr_instance.fr_settings["threshold_prev"],
         threshold_iou=fr_instance.fr_settings["threshold_iou"],
         threshold_lenient_pers=fr_instance.fr_settings["threshold_lenient_pers"],
+        frame_skip=fr_instance.fr_settings.get("frame_skip", 1),
     )
 
 

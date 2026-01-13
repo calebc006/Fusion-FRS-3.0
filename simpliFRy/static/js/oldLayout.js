@@ -1,12 +1,12 @@
 import {
-    setBBoxPos,
-    clearBBoxes,
+    updateBBoxes,
     loadNamelistJSON,
     getTable,
 } from "./utils.js";
 
 const detectionList = document.getElementById("table-detection-list");
 let namelistJSON = undefined;
+let currData = [];
 
 window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
@@ -59,7 +59,9 @@ const fetchDetections = () => {
 
                     buffer = parts[parts.length - 1] || "";
 
-                    updateBBoxes(data);
+                    const videoContainer = document.getElementById("video-container");
+                    currData = updateBBoxes(videoContainer, data, { showLabels: false, showUnknown: true });
+                    
                     updateDetectionList(data);
                     processStream();
                 });
@@ -71,41 +73,6 @@ const fetchDetections = () => {
             console.error("Error fetching detections:", error);
             setTimeout(() => fetchDetections(), 5000);
         });
-};
-
-const updateBBoxes = (data) => {
-    const videoContainer = document.getElementById("video-container");
-    clearBBoxes(videoContainer);
-
-    // Process detections in order of detection (no sorting)
-    data.forEach((detection) => {
-        const unknown = detection.label === "Unknown";
-
-        // if you want to hide unknown bboxes
-        // if (unknown) {
-        //   return;
-        // }
-
-        if (!detection.bbox) return;
-
-        const bboxEl = document.createElement("div");
-        bboxEl.classList.add("bbox");
-        bboxEl.classList.add("bbox-identified");
-
-        // old UI for blue and red boxes
-        // bboxEl.innerHTML = `<p class="bbox-label${unknown ? "" : " bbox-label-identified"}">${detection.label} <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
-
-        // new UI with all blue boxes
-        bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
-
-        setBBoxPos(
-            bboxEl,
-            detection.bbox,
-            videoContainer.offsetWidth,
-            videoContainer.offsetHeight
-        );
-        videoContainer.appendChild(bboxEl);
-    });
 };
 
 const updateDetectionList = (data) => {

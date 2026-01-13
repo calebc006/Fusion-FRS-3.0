@@ -10,6 +10,38 @@ import cv2
 from utils import log_info
 
 
+class RWLock:
+    """
+    Read-Write Lock: allows multiple simultaneous readers OR one exclusive writer.
+    Readers don't block each other, only writers need exclusive access.
+    """
+    def __init__(self):
+        self._read_ready = threading.Condition(threading.Lock())
+        self._readers = 0
+
+    def acquire_read(self):
+        """Acquire a read lock. Multiple readers can hold this simultaneously."""
+        with self._read_ready:
+            self._readers += 1
+
+    def release_read(self):
+        """Release a read lock."""
+        with self._read_ready:
+            self._readers -= 1
+            if self._readers == 0:
+                self._read_ready.notify_all()
+
+    def acquire_write(self):
+        """Acquire a write lock. Blocks until all readers release."""
+        self._read_ready.acquire()
+        while self._readers > 0:
+            self._read_ready.wait()
+
+    def release_write(self):
+        """Release a write lock."""
+        self._read_ready.release()
+
+
 class VideoPlayer:
     """
     Class for streaming video from ffmpeg
@@ -19,7 +51,7 @@ class VideoPlayer:
         """Initialises the class"""
 
         # For modifiables
-        self.vid_lock = threading.Lock()
+        self.vid_lock = RWLock()  # RWLock for concurrent read access
         self.frame_bytes = b"" 
         self.frame_id = 0 # Counter to track new frames
         self.perf_logging = False
@@ -59,6 +91,9 @@ class VideoPlayer:
 
         command = [
             "ffmpeg",
+
+            # Hardware acceleration
+            "-hwaccel", "auto",
 
             # Low-latency RTSP settings
             "-rtsp_transport", "tcp",
@@ -136,11 +171,6 @@ class VideoPlayer:
         frames_processed = 0
         last_data_time = None  # Will be set when we first receive data
 
-        # Perf logging
-        perf_interval_s = 5.0
-        last_perf_log = time.monotonic()
-        last_frames_processed = 0
-
         # MAIN READ LOOP
         while not self.end_event.is_set():
             # Check if process has terminated
@@ -188,21 +218,14 @@ class VideoPlayer:
                 frame_bytes = buffer_bytes[:frame_size]
                 del buffer_bytes[:frame_size]
 
-                with self.vid_lock:
-                    self.frame_bytes = frame_bytes
-                    self.frame_id += 1
+                self.vid_lock.acquire_write()
+                self.frame_bytes = frame_bytes
+                self.frame_id += 1
+                self.vid_lock.release_write()
 
                 frames_processed += 1
                 if frames_processed == 1:
                     log_info("Successfully processed first RGB frame from FFmpeg stream")
-
-                now = time.monotonic()
-                if self.perf_logging and (now - last_perf_log) >= perf_interval_s:
-                    frames_delta = frames_processed - last_frames_processed
-                    fps = frames_delta / max(now - last_perf_log, 1e-9)
-                    log_info(f"Stream perf: fps_in={fps:.1f}, total_frames={frames_processed}")
-                    last_perf_log = now
-                    last_frames_processed = frames_processed
 
         else:
             self._handle_stream_end()
@@ -298,21 +321,31 @@ class VideoPlayer:
         """
 
         frame_size = self.width * self.height * 3
+        last_frame_id = 0
 
         while self.streamThread is not None and self.streamThread.is_alive():
-            with self.vid_lock:
-                frame_bytes = self.frame_bytes
+            # Acquire read lock - multiple readers can hold simultaneously
+            self.vid_lock.acquire_read()
+            current_frame_id = self.frame_id
+            if current_frame_id <= last_frame_id:
+                self.vid_lock.release_read()
+                time.sleep(0.01)
+                continue
+            frame_bytes = self.frame_bytes  # bytes are immutable, so this is safe
+            last_frame_id = current_frame_id
+            self.vid_lock.release_read()
 
             if not frame_bytes or len(frame_bytes) != frame_size:
                 time.sleep(0.01)
                 continue
 
+            # Do expensive operations outside the lock
             frame = np.frombuffer(frame_bytes, np.uint8).reshape(
                 (self.height, self.width, 3)
             )
 
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            _, buffer = cv2.imencode(".jpg", frame_bgr)
+            _, buffer = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 75])
 
             yield (
                 b"--frame\r\n"

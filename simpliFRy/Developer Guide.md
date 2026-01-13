@@ -76,7 +76,8 @@ Tunable parameters via `/submit_settings` endpoint (Settings UI posts here). All
 | **FR Threshold** | `threshold` | 0.45 | [0.30, 0.90], step 0.01 | Max cosine distance for face match. Higher = more lenient |
 | **Holding Time** | `holding_time` | 3 | [1, 120]s, step 1 | Duration to cache recognized faces (affects persistor + sidebar display) |
 | **Use Brute Force** | `use_brute_force` | false | bool | Toggle between brute force (exact) and Voyager (fast ANN) search |
-| **Perf Logging** | `perf_logging` | false | bool | If enabled, periodically logs stream FPS and inference/search timings to `data/logs/` |
+| **Perf Logging** | `perf_logging` | false | bool | If enabled, periodically logs inference FPS, avg inference time, and search timings to `data/logs/` |
+| **Frame Skip** | `frame_skip` | 1 | [1, 10], step 1 | Process every Nth frame (1=no skip, 2=every other frame). Higher values reduce CPU/GPU load |
 
 ### Differentiator Parameters
 
@@ -176,3 +177,51 @@ Tunable parameters via `/submit_settings` endpoint (Settings UI posts here). All
 **Request** (form-data): See [Configuration](#configuration) table for all parameters
 
 **Response**: HTTP 200 → redirect to `/settings`
+
+---
+
+## Performance Optimizations
+
+### Video Streaming Latency
+
+Several optimizations reduce end-to-end latency:
+
+1. **Hardware Acceleration**: FFmpeg uses GPU decoding (`-hwaccel auto`) when available, on top of other latency optimization settings
+2. **JPEG Quality**: Reduced to 75% for faster encoding (configurable in `VideoPlayer.py`)
+3. **Frame Dropping**: Clients automatically skip to latest frame if behind, preventing buffering lag
+4. **Thread Synchronization (RWLock)**: The video pipeline uses a **Read-Write Lock** (`RWLock` implemented in `VideoPlayer.py`) instead of a standard mutex for optimal concurrent access. Only the RTSP stream **writes** new frames, while the inference and broadcast threads only **read** `frame_bytes`. RWLock allows multiple simultaneous readers, only blocking for writes. This eliminates the ~90% wait time that occurred when video feed was open with a standard mutex.
+
+### Inference Performance
+
+**Model Configuration** (`FRVidPlayer.py`):
+- **buffalo_l** model optimized with `det_size=(640,640)` and `det_thresh=0.5`
+- Only loads detection + recognition modules (skips age/gender estimation)
+- Supports CUDA for GPU acceleration (automatically detected)
+
+**Frame Skip** (`frame_skip` setting):
+- Process every Nth frame to reduce computational load
+- Default=1 (no skip), recommended 2-3 for high-resolution streams
+- Persistor mechanic maintains detections between skipped frames
+
+**Expected Performance** (RTX A5000 + Buffalo_L @ 720p):
+- 1 face: ~55-80 FPS (~12-18ms per inference)
+- 3 faces: ~33-50 FPS (~20-30ms per inference)
+
+**Performance Logging** (`perf_logging=true`):
+```
+[PERF] infer:12fps/18ms search:0.2ms skip:2
+```
+- `infer`: Actual inference rate / average time per inference
+- `search`: Vector search time (Voyager or brute force)
+- `skip`: Current frame_skip setting
+
+### Frontend Rendering
+
+**DOM Optimization** (`utils.js` → `updateBBoxes`):
+- Reuses existing bounding box DOM elements instead of recreating
+- Configurable via `showLabels` and `showUnknown` options
+
+**Detection Broadcast Throttling** (`FRVidPlayer.py`):
+- Caps detection updates at ~30 FPS
+- Only sends updates when results change
+- Reduces network overhead and client-side processing

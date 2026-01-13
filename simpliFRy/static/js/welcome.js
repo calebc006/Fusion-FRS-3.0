@@ -3,8 +3,8 @@ import {
     getDescription,
     setBBoxPos,
     clearBBoxes,
+    updateBBoxes,
     loadNamelistJSON,
-    delay,
 } from "./utils.js";
 
 const N = 3; // number of detections shown (last N)
@@ -151,20 +151,13 @@ const sortDetections = (detectionList) => {
 };
 
 const updateDetections = (data) => {
-    currData = [];
     detectionList.innerHTML = "";
-    clearBBoxes(videoContainer);
     const uniqueLabels = new Set();
     let mostRecentDetection = null;
 
-    // Process detections in order of detection (no sorting)
+    // Process detections for the list (non-bbox related)
     data.forEach((detection) => {
         const unknown = detection.label === "Unknown";
-
-        // if you want to hide unknown bboxes
-        // if (unknown) {
-        //   return;
-        // }
 
         if (!unknown && !uniqueLabels.has(detection.label)) {
             const description = getDescription(detection.label, namelistJSON);
@@ -176,34 +169,10 @@ const updateDetections = (data) => {
         if (!unknown) {
             mostRecentDetection = detection.label;
         }
-
-        if (!detection.bbox) return;
-
-        const bboxEl = document.createElement("div");
-        bboxEl.classList.add("bbox");
-        if (!unknown) {
-            bboxEl.classList.add("bbox-identified");
-        }
-
-        // old UI for blue and red boxes
-        bboxEl.innerHTML = `<p class="bbox-label${
-            unknown ? "" : " bbox-label-identified"
-        }">${
-            detection.label
-        } <span class="bbox-score">${detection.score.toFixed(2)}</span></p>`;
-
-        // new UI with all blue boxes
-        // bboxEl.innerHTML = `<p class="bbox-label${" bbox-label-identified"}"><span class="bbox-score"></span></p>`;
-
-        currData.push(detection.bbox);
-        setBBoxPos(
-            bboxEl,
-            detection.bbox,
-            videoContainer.offsetWidth,
-            videoContainer.offsetHeight
-        );
-        videoContainer.appendChild(bboxEl);
     });
+
+    // Use optimized bbox update utility with labels shown
+    currData = updateBBoxes(videoContainer, data, { showLabels: true, showUnknown: true });
 
     // Update country flag for the latest detection
     if (mostRecentDetection) {

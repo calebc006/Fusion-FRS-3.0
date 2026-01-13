@@ -5,15 +5,15 @@
 }
 
 #video-feed {
-    width: 52vw;
+    width: 44vw;
 }
 
 .table-detection-list {
     position: absolute;
-    top: 30vh;
+    top: 35vh;
     left: 60vw;
     width: 30vw;
-    padding-left: 10px;
+    padding-left: 5px;
     padding-right: 10px;
 }
 
@@ -22,4 +22,5 @@
     font-family: Helvetica, sans-serif;
     color: black;
     margin-bottom: 10px;
+    text-align: center;
 }

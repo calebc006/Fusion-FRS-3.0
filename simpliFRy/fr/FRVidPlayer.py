@@ -95,13 +95,21 @@ class FRVidPlayer(VideoPlayer):
         provider = "CUDAExecutionProvider" if is_cuda_available() else "CPUExecutionProvider"
 
         # For FR algorithm
-        self.model = FaceAnalysis(providers=[provider])
-        self.model.prepare(ctx_id=0)
+        # Buffalo_L with optimized settings for RTX A5000
+        self.model = FaceAnalysis(
+            name="buffalo_l",
+            providers=[provider],
+            allowed_modules=["detection", "recognition"],  # Skip unnecessary modules (age, gender, etc.)
+        )
+        # det_size: Smaller = faster detection. 640x640 is default, 480x480 or 320x320 for speed
+        # det_thresh: Higher = fewer false positives, faster (skips low-confidence faces)
+        self.model.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
 
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
         self.name_list = []
         self.embeddings_array = np.array([])  # For brute force search
         self.db_norms = np.array([]) # Pre-computed norms for brute force search
+        self.db_embeddings_normalized = np.array([])  # Pre-computed normalized embeddings
 
         self.recent_detections: list[RecentDetection] = []
 
@@ -126,6 +134,7 @@ class FRVidPlayer(VideoPlayer):
             "threshold_prev": fr_settings.get("threshold_prev", 0.3),
             "threshold_iou": fr_settings.get("threshold_iou", 0.2),        
             "threshold_lenient_pers": fr_settings.get("threshold_lenient_pers", 0.60),
+            "frame_skip": fr_settings.get("frame_skip", 1),  # Process every Nth frame (1 = no skip)
         }
 
         with open(FR_SETTINGS_FP, 'w') as file:
@@ -274,6 +283,7 @@ class FRVidPlayer(VideoPlayer):
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
         self.embeddings_array = np.array([])
         self.db_norms = np.array([])
+        self.db_embeddings_normalized = np.array([])
 
     def _fetch_embeddings(self) -> None:
         """Load embeddings from SQLite database"""
@@ -295,9 +305,10 @@ class FRVidPlayer(VideoPlayer):
         
         if embeddings_list:
             self.embeddings_array = np.array(embeddings_list)
-            # Pre-compute norms
+            # Pre-compute norms and normalized embeddings
             self.db_norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
             self.db_norms[self.db_norms == 0] = 1
+            self.db_embeddings_normalized = self.embeddings_array / self.db_norms
 
         log_info(f"Loaded {len(self.name_list)} embeddings from db")       
 
@@ -344,9 +355,10 @@ class FRVidPlayer(VideoPlayer):
             
             if embeddings_list:
                 self.embeddings_array = np.array(embeddings_list)
-                # Pre-compute norms for brute-force search
+                # Pre-compute norms and normalized embeddings for brute-force search
                 self.db_norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
                 self.db_norms[self.db_norms == 0] = 1
+                self.db_embeddings_normalized = self.embeddings_array / self.db_norms
         
         # Save cache info after successful generation
         data_file_path = os.path.join('data', data_file)
@@ -370,29 +382,35 @@ class FRVidPlayer(VideoPlayer):
         neighbours = []
         distances = []
         
-        # Use pre-computed norms
-        if self.db_norms.size == 0 and self.embeddings_array.size > 0:
+        # Use pre-computed normalized embeddings
+        if self.db_embeddings_normalized.size == 0 and self.embeddings_array.size > 0:
              # Fallback if somehow not computed (safety)
             self.db_norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
             self.db_norms[self.db_norms == 0] = 1
-
-        db_embeddings_normalized = self.embeddings_array / self.db_norms
+            self.db_embeddings_normalized = self.embeddings_array / self.db_norms
         
         for query_embed in query_embeddings:
-            # Normalize query embedding
+            # Normalize query embedding (ensure float32)
+            query_embed = np.asarray(query_embed, dtype=np.float32)
             query_norm = np.linalg.norm(query_embed)
             if query_norm == 0:
                 query_norm = 1
             query_normalized = query_embed / query_norm
             
-            # Compute cosine similarities
-            cosine_similarities = np.dot(db_embeddings_normalized, query_normalized)
+            # Compute cosine similarities (optimized with float32)
+            cosine_similarities = np.dot(self.db_embeddings_normalized, query_normalized)
             
             # Convert to cosine distances (1 - similarity)
             cosine_distances = 1 - cosine_similarities
             
-            # Get k nearest neighbors (smallest distances)
-            nearest_indices = np.argsort(cosine_distances)[:k]
+            # Get k nearest neighbors using argpartition (faster than full sort for small k)
+            if k >= len(cosine_distances):
+                nearest_indices = np.arange(len(cosine_distances))
+            else:
+                # argpartition is O(n) vs argsort O(n log n)
+                partition_indices = np.argpartition(cosine_distances, k)[:k]
+                nearest_indices = partition_indices[np.argsort(cosine_distances[partition_indices])]
+            
             nearest_distances = cosine_distances[nearest_indices]
             
             neighbours.append(nearest_indices.tolist())
@@ -560,15 +578,19 @@ class FRVidPlayer(VideoPlayer):
                 return [{"label": label} for label in extra_labels]
 
             # Use brute force or Voyager search based on settings
+            # Optimize k: only need k=2 if differentiator is enabled, otherwise k=1 is sufficient
+            k = 2 if self.fr_settings["use_differentiator"] else 1
+            k = min(k, len(self.name_list))
+            
             t_search0 = time.monotonic() if self.fr_settings.get("perf_logging", False) else None
             if self.fr_settings["use_brute_force"]:
                 neighbours, distances = self._brute_force_search(
-                    embeddings_list, k=min(2, len(self.name_list))
+                    embeddings_list, k=k
                 )
                 self._last_search_backend = "brute"
             else:
                 neighbours, distances = self.vector_index.query(
-                    embeddings_list, k=min(2, len(self.name_list))
+                    embeddings_list, k=k
                 )
                 self._last_search_backend = "voyager"
             if t_search0 is not None:
@@ -632,6 +654,7 @@ class FRVidPlayer(VideoPlayer):
         """Repeatedly conducts inference on the latest frame from the ffmpeg video stream"""
 
         last_processed_id = -1
+        frame_counter = 0
 
         # Perf logging
         perf_interval_s = 5.0
@@ -641,12 +664,15 @@ class FRVidPlayer(VideoPlayer):
         search_time_s_sum = 0.0
         search_calls = 0
         skipped_same_frame = 0
+        skipped_for_performance = 0
 
         while self.streamThread.is_alive() and not self.end_event.is_set():
             try:
-                with self.vid_lock:
-                    current_id = self.frame_id
-                    frame_bytes = self.frame_bytes
+                # Acquire read lock - doesn't block other readers (broadcast thread)
+                self.vid_lock.acquire_read()
+                current_id = self.frame_id
+                frame_bytes = self.frame_bytes
+                self.vid_lock.release_read()
                 
                 # Skip if we've already processed this frame
                 if current_id == last_processed_id:
@@ -655,6 +681,13 @@ class FRVidPlayer(VideoPlayer):
                     continue
                 
                 last_processed_id = current_id
+                frame_counter += 1
+                
+                # Frame skipping for performance (process every Nth frame)
+                frame_skip = self.fr_settings.get("frame_skip", 1)
+                if frame_skip > 1 and (frame_counter % frame_skip) != 0:
+                    skipped_for_performance += 1
+                    continue
 
                 if self.fr_settings.get("perf_logging", False):
                     t0 = time.monotonic()
@@ -676,19 +709,16 @@ class FRVidPlayer(VideoPlayer):
                     fps_infer = infer_calls / interval
                     avg_ms = (infer_time_s_sum / max(infer_calls, 1)) * 1000.0
                     avg_search_ms = (search_time_s_sum / max(search_calls, 1)) * 1000.0
-                    backend = getattr(self, "_last_search_backend", "unknown")
-                    log_info(
-                        "Infer perf: "
-                        f"fps_infer={fps_infer:.1f}, avg_infer_ms={avg_ms:.1f}, "
-                        f"avg_search_ms={avg_search_ms:.2f} ({backend}), "
-                        f"skipped_same_frame={skipped_same_frame}"
-                    )
+                    skip = self.fr_settings.get("frame_skip", 1)
+                    wait_ratio = skipped_same_frame / max(skipped_same_frame + infer_calls, 1)
+                    log_info(f"[PERF] infer:{fps_infer:.1f}fps/{avg_ms:.0f}ms search:{avg_search_ms:.1f}ms skip:{skip} wait:{wait_ratio:.1%}")
                     last_perf_log = now
                     infer_calls = 0
                     infer_time_s_sum = 0.0
                     search_time_s_sum = 0.0
                     search_calls = 0
                     skipped_same_frame = 0
+                    skipped_for_performance = 0
             except Exception as e:
                 log_info(f"Error in inference loop: {e}")
                 log_info(traceback.format_exc())
@@ -713,12 +743,33 @@ class FRVidPlayer(VideoPlayer):
         Returns
         - Generator yielding FR detection results (list of typed dictionary)
         """
+        
+        last_results_hash = None
+        min_interval = 0.033  # ~30 FPS max for detection updates (reduces network overhead)
+        last_send_time = 0.0
 
         while self.inferenceThread is not None and self.inferenceThread.is_alive():
             try:
+                now = time.monotonic()
+                
+                # Throttle to avoid flooding client
+                if (now - last_send_time) < min_interval:
+                    time.sleep(0.005)
+                    continue
+                
                 with self.inference_lock:
-                    yield json.dumps({"data": self.fr_results}) + '\n'
-                    # time.sleep(0.005) # cap FPS at 200
+                    results = self.fr_results
+                
+                # Only send if results changed (reduces redundant updates)
+                results_hash = hash(str(results))
+                if results_hash == last_results_hash:
+                    time.sleep(0.005)
+                    continue
+                
+                last_results_hash = results_hash
+                last_send_time = now
+                yield json.dumps({"data": results}) + '\n'
+                
             except Exception as e:
                 log_info(f"Error in detection broadcast: {e}")
                 log_info(traceback.format_exc())
