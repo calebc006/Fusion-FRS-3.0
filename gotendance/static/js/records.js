@@ -92,8 +92,7 @@ class Records {
         console.log("All tags found:", Array.from(this.allTags))
         console.log(this.data)
         this.createRecordsEl()
-        this.presentVal = this.updateNumbers(this.data)
-        updateAttendance(this.presentVal, Object.keys(this.data).length);
+        this.applyAllFilters(); // This will update the attendance display with correct counts
     }
 
     updateNumbers(dataInput){
@@ -137,11 +136,12 @@ class Records {
             if (!response.ok) throw new Error('Bad response')
             return response.json()
         }).then(data => {
-            init && this.loadData(data)
-            init || this.updateData(data)
-            let tempAttendance = 0
-            tempAttendance = this.updateNumbers(data)
-            updateAttendance(tempAttendance,Object.keys(data).length)
+            if (init) {
+                this.loadData(data)
+            } else {
+                this.updateData(data)
+            }
+            // applyAllFilters (called by loadData/updateData) handles updating the attendance display
             return data
         }).catch(error => {
             console.log("Fetch operation failed", error)
@@ -171,6 +171,9 @@ class Records {
     }
 
     applyAllFilters() {
+        let filteredTotal = 0;
+        let filteredPresent = 0;
+        
         Object.entries(this.data).map(([name, details]) => {
             const entryEl = this.data[name].rowEl;
             if (entryEl) {
@@ -192,9 +195,21 @@ class Records {
                 }
 
                 // Show only if both filters pass
-                entryEl.style.display = (showByStatus && showByTag) ? '' : 'none';
+                const isVisible = showByStatus && showByTag;
+                entryEl.style.display = isVisible ? '' : 'none';
+                
+                // Count based on tag filter only (ignore status filter for count)
+                if (showByTag) {
+                    filteredTotal++;
+                    if (details.attendance) {
+                        filteredPresent++;
+                    }
+                }
             }
         });
+        
+        // Update attendance display with filtered counts
+        updateAttendance(filteredPresent, filteredTotal);
     }
 }
 

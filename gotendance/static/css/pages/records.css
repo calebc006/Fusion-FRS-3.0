@@ -345,16 +345,24 @@ button{
 }
 
 .tag-filter-buttons button.select-all-btn {
-    background-color: #34495eaf;
-    margin-right: 10px;
+    background-color: #1a252f;
+    margin-right: 15px;
+    border: 2px solid #4a6278;
+    padding: 10px 22px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 12px;
 }
 
 .tag-filter-buttons button.select-all-btn:hover {
     background-color: #229954;
+    border-color: #229954;
 }
 
 .tag-filter-buttons button.select-all-btn.active {
     background-color: #27ae60;
+    border-color: #27ae60;
     box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
 }
 
