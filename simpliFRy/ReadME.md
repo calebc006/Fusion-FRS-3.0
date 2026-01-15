@@ -148,7 +148,8 @@ simpliFRy/
       "country_flag": "singapore_flag.png",
       "description": "someone",
       "table": "T1",
-      "tags": ["Army", "DIS"]
+      "tags": ["Army", "DIS"],
+      "priority": 2
     },
     {
       "name": "3SG CALEB CHIA",
@@ -156,17 +157,20 @@ simpliFRy/
       "country_flag": "singapore_flag.png",
       "description": "someone else",
       "table": "VIP",
-      "tags": ["Air Force"]
+      "tags": ["Air Force"],
+      "priority": 1
     }
   ]
 }
 ```
 
-- `img_folder_path` will the path to the folder with all the faces relative to `/data`
+- `img_folder_path` (optional) will the path to the folder with all the faces relative to `/data`
 
-- `flag_folder_path` will the path to the folder with all the country flags relative to `/data`
+- `flag_folder_path` (optional) will the path to the folder with all the country flags relative to `/data`
 
-- **The fields `flag_folder_path`, `country_flag`, `description`, `table`, `tags` can be omitted if the deployment does not require these information. However this must be consistent throughout the JSON file.**
+- `priority` (optional) determines the sorting order in detection lists (lower number = shown first). If two people have the same priority or no priority is set, they are sorted alphabetically.
+
+- **The fields `flag_folder_path`, `country_flag`, `description`, `table`, `tags`, `priority` can be omitted if the deployment does not require these information.**
 
 ### `/data` Directory
 

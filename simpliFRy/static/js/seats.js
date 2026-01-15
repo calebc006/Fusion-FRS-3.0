@@ -3,6 +3,7 @@ import {
     clearBBoxes,
     loadNamelistJSON,
     getTable,
+    sortDetectionsByPriority,
 } from "./utils.js";
 
 let namelistJSON = null;
@@ -621,15 +622,12 @@ const updateTableDetections = (data) => {
 
         let detectionEl = document.createElement("div");
         detectionEl.classList.add("table-detection-element");
+        detectionEl.dataset.name = name; // For priority sorting
         detectionEl.innerHTML = `${name} ${table}`;
 
         detections.push(detectionEl);
     });
 
-    detections = sortTableDetections(detections);
+    detections = sortDetectionsByPriority(detections, namelistJSON);
     detectionList.replaceChildren(...detections);
-};
-
-const sortTableDetections = (detectionList) => {
-    return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText));
 };

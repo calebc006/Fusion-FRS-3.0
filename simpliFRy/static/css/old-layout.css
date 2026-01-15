@@ -1,7 +1,7 @@
 #video-container {
     position: absolute;
     left: 50px;
-    top: 32vh;
+    top: 38vh;
 }
 
 #video-feed {
@@ -18,9 +18,20 @@
 }
 
 .table-detection-element {
-    font-size: 40px;
     font-family: Helvetica, sans-serif;
     color: black;
     margin-bottom: 10px;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.table-detection-element .detection-name {
+    font-size: 48px;
+    font-weight: bold;
+}
+
+.table-detection-element .detection-desc {
+    font-size: 32px;
+    color: #444;
 }

@@ -2,6 +2,8 @@ import {
     updateBBoxes,
     loadNamelistJSON,
     getTable,
+    getDescription,
+    sortDetectionsByPriority,
 } from "./utils.js";
 
 const detectionList = document.getElementById("table-detection-list");
@@ -91,17 +93,16 @@ const updateDetectionList = (data) => {
             table = "(" + table + ")"; 
         }
 
+        let description = getDescription(name, namelistJSON);
+
         let detectionEl = document.createElement("div");
         detectionEl.classList.add("table-detection-element");
-        detectionEl.innerHTML = `${name} ${table}`;
+        detectionEl.dataset.name = name; // For priority sorting
+        detectionEl.innerHTML = `<span class="detection-name">${name} ${table}</span>${description ? `<span class="detection-desc">${description}</span>` : ""}`;
 
         detections.push(detectionEl);
     });
 
-    detections = sortDetections(detections);
+    detections = sortDetectionsByPriority(detections, namelistJSON);
     detectionList.replaceChildren(...detections);
-};
-
-const sortDetections = (detectionList) => {
-    return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText));
 };

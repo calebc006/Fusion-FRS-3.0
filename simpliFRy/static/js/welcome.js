@@ -5,6 +5,7 @@ import {
     clearBBoxes,
     updateBBoxes,
     loadNamelistJSON,
+    sortDetectionsByPriority,
 } from "./utils.js";
 
 const N = 3; // number of detections shown (last N)
@@ -75,19 +76,19 @@ const addDetectionEl = (name, description) => {
             ? ""
             : `<p class="detectionDesc">${description}</p>`
     }`;
-    // detectionEl.innerHTML = `<p class="detectionName">${name}</p>`;
     detectionEl.classList.add("detectionEntry");
+    detectionEl.dataset.name = name; // For priority sorting
 
     detectionList.appendChild(detectionEl);
 
-    // show last N detections
+    // show last N detections, sorted by priority
     if (detectionList.children.length > N) {
         detectionList.replaceChildren(
-            ...sortDetections([...detectionList.children]).slice(-N)
+            ...sortDetectionsByPriority([...detectionList.children], namelistJSON).slice(-N)
         );
     } else {
         detectionList.replaceChildren(
-            ...sortDetections([...detectionList.children])
+            ...sortDetectionsByPriority([...detectionList.children], namelistJSON)
         );
     }
 };
@@ -143,11 +144,6 @@ export const endDetections = () => {
 
     // Clear the country flag
     countryFlagImg.style.display = "none";
-};
-
-// takes in an array of HTML detection elements and returns a sorted list
-const sortDetections = (detectionList) => {
-    return detectionList.sort((a, b) => a.innerText.localeCompare(b.innerText));
 };
 
 const updateDetections = (data) => {

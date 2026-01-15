@@ -73,6 +73,43 @@ export const getTable = (name, namelistJSON) => {
     return null;
 };
 
+// Get priority for a given name (lower number = higher priority)
+export const getPriority = (name, namelistJSON) => {
+    if (!namelistJSON || !namelistJSON.details) return Infinity;
+
+    const person = namelistJSON.details.find((detail) => {
+        return (
+            detail.name.toLowerCase().includes(name.toLowerCase()) ||
+            name.toLowerCase().includes(detail.name.toLowerCase())
+        );
+    });
+
+    if (person && typeof person.priority === "number") {
+        return person.priority;
+    }
+
+    return Infinity; // No priority = lowest priority
+};
+
+// Sort detection elements by priority, then alphabetically
+// Each element should have a data-name attribute for sorting
+export const sortDetectionsByPriority = (detectionList, namelistJSON) => {
+    return detectionList.sort((a, b) => {
+        const nameA = a.dataset.name || a.innerText;
+        const nameB = b.dataset.name || b.innerText;
+        const priorityA = getPriority(nameA, namelistJSON);
+        const priorityB = getPriority(nameB, namelistJSON);
+
+        // Sort by priority first (lower number = higher priority)
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+        }
+
+        // If same priority, sort alphabetically
+        return nameA.localeCompare(nameB);
+    });
+};
+
 // updates the position of a bounding box element
 export const setBBoxPos = (bboxEl, bbox, video_width, video_height) => {
     let ratiod_height = video_height,

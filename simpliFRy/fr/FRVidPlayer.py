@@ -99,7 +99,7 @@ class FRVidPlayer(VideoPlayer):
         self.model = FaceAnalysis(
             name="buffalo_l",
             providers=[provider],
-            allowed_modules=["detection", "recognition"],  # Skip unnecessary modules (age, gender, etc.)
+            allowed_modules=["detection", "recognition"],  # Skip unnecessary modules (age, gender, etc.),
         )
         # det_size: Smaller = faster detection. 640x640 is default, 480x480 or 320x320 for speed
         # det_thresh: Higher = fewer false positives, faster (skips low-confidence faces)
