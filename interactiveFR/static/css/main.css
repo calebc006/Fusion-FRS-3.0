@@ -1,0 +1,142 @@
+:root {
+    --color-background: #242424;
+    --color-foreground: #dddddd;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --color-background: #fff;
+        --color-foreground: #000;
+    }
+}
+
+hr {
+    width: 2px;
+    background-color: #fff;
+    color: #fff;
+}
+
+body {
+    height: 100vh;
+    width: 100vw;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.bg-image {
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+}
+
+.title {
+    /* margin-top: 0.75em; */
+    text-align: center;
+    margin-right: 20px;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 40px;
+}
+
+.hidden-object {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        max-width: 95vw;
+        max-height: 95vh;
+        margin: 1em;
+    }
+
+    .modal-header {
+        padding: 0.75em 1em;
+    }
+
+    .modal-header h2 {
+        font-size: 1.2em;
+    }
+
+    #video-container {
+        margin: 0;
+    }
+}
+
+.bbox {
+    position: absolute;
+    background-color: transparent;
+    border: 5px solid red;
+    border-radius: 5px;
+}
+
+.bbox-unknown {
+    border-color: red;
+}
+
+.bbox-identified {
+    border-color: blue;
+}
+
+.bbox-target {
+    border-color: #00d06c;
+    box-shadow: 0 0 12px rgba(0, 208, 108, 0.7);
+}
+
+.bbox-label {
+    font-size: 100%;
+    font-weight: bold;
+    color: red;
+    position: absolute;
+    width: max-content;
+    top: -3em;
+    left: 50%;
+    -webkit-transform: translateX(-50%);
+    transform: translateX(-50%);
+}
+
+.bbox-label-unknown {
+    color: red;
+}
+
+.bbox-label-identified {
+    color: blue;
+}
+
+.bbox-label-target {
+    color: #00d06c;
+}
+
+.bbox-score {
+    margin-left: 10px;
+    font-style: italic;
+}
+
+.flex-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.flex-container-logo {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    height: 100px;
+    width: auto;
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    opacity: 70%;
+}
+
+.fusion-logo {
+    padding-top: 10px;
+    height: 80px;
+    width: auto;
+    margin-right: 20px;
+}

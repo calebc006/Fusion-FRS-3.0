@@ -1,0 +1,77 @@
+.taskbar-placeholder {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.taskbar {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    visibility: hidden;
+    transition: visibility 0s 0.3s, transform 0.3s ease-in-out;
+    transform: translateY(100%);
+}
+
+.taskbar button {
+    padding: 1em 1.5em;
+    margin-bottom: 0.5em;
+    margin-right: 0.5em;
+    color: var(--color-foreground);
+    background-color: rgba(167, 50, 50, 0.8);
+    border-width: 0px;
+    border-radius: 1em;
+    cursor: pointer;
+    transition: background-color 0.2s ease, pointer-events 0.2s ease;
+}
+
+.taskbar button:hover {
+    background-color: rgba(167, 50, 50, 0.5);
+}
+
+#open-video-modal-button {
+    background-color: rgba(68, 148, 68, 0.8);
+    cursor: pointer;
+}
+
+#open-video-modal-button:hover {
+    background-color: rgba(68, 148, 68, 0.5);
+}
+
+#toggle-seating-button {
+    background-color: rgba(190, 19, 206, 0.8);
+}
+
+#toggle-seating-button:hover {
+    background-color: rgba(190, 19, 206, 0.5);
+}
+
+#home-button {
+    background-color: rgba(19, 84, 206, 0.8);
+}
+
+#home-button:hover {
+    background-color: rgba(19, 84, 206, 0.5);
+}
+
+#settings-button {
+    background-color: rgba(65, 60, 60, 0.8);
+}
+
+#settings-button:hover {
+    background-color: rgba(100, 93, 93, 0.527);
+}
+
+
+.taskbar.show {
+    visibility: visible;
+    transform: translateY(0%);
+    transition: transform 0.3s ease-in-out;
+}
+
+.taskbar.show button {
+    pointer-events: auto;
+}

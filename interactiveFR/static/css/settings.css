@@ -1,0 +1,23 @@
+.form {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+}
+
+.form-section {
+    width: 300px;
+    margin-bottom: 1em;
+}
+
+.submit-button {
+    padding: 0.8em 1.5em;
+    background-color: rgb(47, 79, 79);
+    border-radius: 1em;
+    border-width: 0;
+    color: var(--color-foreground);
+}
+
+.submit-button:hover {
+    background-color: rgb(35, 65, 65);
+    cursor: pointer;
+}

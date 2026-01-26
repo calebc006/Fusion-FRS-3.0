@@ -1,0 +1,18 @@
+--extra-index-url https://download.pytorch.org/whl/cu118
+
+albucore==0.0.24
+tqdm==4.66.1
+voyager==2.0.6
+Flask==3.0.3
+Flask-Cors==5.0.0
+albumentations==2.0.8
+insightface==0.7.3
+numpy==1.24.4
+Pillow==10.3.0
+python-dotenv==1.2.1
+waitress==3.0.2
+opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
+onnxruntime-gpu==1.18.1
+torch==2.1.2+cu118
+torchvision==0.16.2+cu118

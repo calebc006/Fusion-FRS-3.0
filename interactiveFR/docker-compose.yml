@@ -1,0 +1,16 @@
+services:
+    interactivefr:
+        build: .
+        ports:
+            - "1334:1334"
+        volumes:
+            - ./data:/app/data
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        env_file:
+            - ./.env
