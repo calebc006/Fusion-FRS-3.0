@@ -65,6 +65,14 @@
     background-color: rgba(100, 93, 93, 0.527);
 }
 
+#reset-button {
+    background-color: rgba(180, 42, 42, 0.9);
+}
+
+#reset-button:hover {
+    background-color: rgba(180, 42, 42, 0.6);
+}
+
 
 .taskbar.show {
     visibility: visible;

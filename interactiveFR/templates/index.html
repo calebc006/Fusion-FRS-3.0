@@ -19,7 +19,7 @@
 
     <!-- Initialisation form -->
     <form id="init" class="form">
-      <label for="stream_src_select">Video Stream Source</label>
+      <label for="stream_src_select" style="font-size: x-large;">Video Stream Source</label>
       <select
         id="stream_src_select"
         class="init-input"
@@ -62,16 +62,6 @@
         placeholder="Enter webcam device name (optional)"
       />
 
-      <div id="drop-zone" class="drop-zone">
-        <p>Optional: drag and drop your JSON file here</p>
-        <p class="drop-zone-divider">or</p>
-        <button type="button" id="file-button" class="file-button">
-          Browse Files
-        </button>
-      </div>
-      <input type="hidden" id="data_file" name="data_file" />
-      <p id="file-name" class="file-name"></p>
-
       <input
         type="submit"
         id="submit-button"
@@ -79,26 +69,6 @@
         value="Submit"
       />
     </form>
-
-    <!-- Post-init Screen -->
-    <div id="info-menu">
-      <h2>FR initialized!</h2>
-      <p>Stream URL: <span id="stream-url"></span></p>
-      <p>Namelist Path: <span id="namelist-path"></span></p>
-      <button
-        id="open-video-modal-button"
-        class="nav-button"
-        style="margin-top: 1em"
-      >
-        Open Video
-      </button>
-      <br /><br /><br />
-
-      <p style="font-family: &quot;Courier&quot;">Open interactive view:</p>
-      <div style="font-family: &quot;Courier&quot;" class="nav-buttons">
-        <a href="/interactive" class="nav-button">/interactive</a>
-      </div>
-    </div>
 
     <!-- Video Modal -->
     <div id="video-modal" class="modal hidden">

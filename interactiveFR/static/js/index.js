@@ -1,24 +1,14 @@
 const customInput = document.getElementById("stream_src_custom");
 const webcamInput = document.getElementById("webcam_device");
 const form = document.getElementById("init");
-const infoMenu = document.getElementById("info-menu");
-let namelistPath = null;
 
 window.addEventListener("DOMContentLoaded", async () => {
     fetch("/checkAlive")
         .then((response) => response.text())
         .then((data) => {
             if (data === "Yes") {
-                // Hide form and show post-init menu
-                form.style.display = "none";
-                infoMenu.style.display = "flex";
-                document.getElementById("stream-url").textContent =
-                    localStorage.getItem("streamSrc") || "N/A";
-                document.getElementById("namelist-path").textContent =
-                    localStorage.getItem("namelistPath") || "N/A";
+                window.location.href = "/interactive";
             } else {
-                // Hide post-init menu and show form
-                infoMenu.style.display = "none";
                 form.style.display = "flex";
             }
         })
@@ -33,15 +23,6 @@ document.getElementById("init").onsubmit = async (event) => {
 
     const form = event.target;
     const formData = new FormData(form);
-
-    // Set namelist path if provided
-    const dataFile = formData.get("data_file");
-    if (dataFile) {
-        namelistPath = `./data/${dataFile}`;
-        localStorage.setItem("namelistPath", namelistPath);
-    } else {
-        localStorage.removeItem("namelistPath");
-    }
 
     // Store stream source
     const streamSrc = formData.get("stream_src");
@@ -71,17 +52,14 @@ document.getElementById("init").onsubmit = async (event) => {
             if (data.stream) {
                 console.log("Stream started!");
 
-                // Hide form, loader and show post-init menu
+                // Hide form, loader and send to interactive
                 clearInterval(intervalId);
                 loader.remove();
                 form.style.display = "none";
-                infoMenu.style.display = "flex";
-                document.getElementById("stream-url").textContent =
-                    localStorage.getItem("streamSrc") || "N/A";
-                document.getElementById("namelist-path").textContent =
-                    localStorage.getItem("namelistPath") || "N/A";
+                window.location.href = "/interactive";
             } else {
                 alert(data.message);
+                window.reload();
             }
         });
 };
@@ -145,67 +123,6 @@ streamSelectElem.addEventListener("change", function () {
     }
 });
 
-// ------------ Drag/Drop File Handling ---------------
-
-const dropZone = document.getElementById("drop-zone");
-const fileButton = document.getElementById("file-button");
-const dataFileInput = document.getElementById("data_file");
-const fileNameDisplay = document.getElementById("file-name");
-let selectedFileName = "";
-
-// Handle file button click
-fileButton.addEventListener("click", (e) => {
-    e.preventDefault();
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            handleFileSelection(file.name);
-        }
-    };
-    input.click();
-});
-
-// Handle drag over
-dropZone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.add("dragover");
-});
-
-// Handle drag leave
-dropZone.addEventListener("dragleave", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("dragover");
-});
-
-// Handle drop
-dropZone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("dragover");
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        const file = files[0];
-        if (file.name.endsWith(".json")) {
-            handleFileSelection(file.name);
-        } else {
-            alert("Please drop a .json file");
-        }
-    }
-});
-
-// Handle file selection
-const handleFileSelection = (fileName) => {
-    selectedFileName = fileName;
-    dataFileInput.value = fileName;
-    fileNameDisplay.textContent = `Selected: ${fileName}`;
-};
-
 // Optional: Form validation reminder
 form.addEventListener("submit", function (e) {
     if (streamSelectElem.value === "custom" && !customInput.value.trim()) {
@@ -230,7 +147,6 @@ document
         })
             .then((response) => response.json())
             .then((_data) => {
-                localStorage.removeItem("namelistPath");
                 localStorage.removeItem("streamSrc");
                 location.reload();
             });

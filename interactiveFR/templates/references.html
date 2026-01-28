@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reference Images</title>
+    <link rel="icon" href="../static/images/fusionlogo.png" />
+    <link rel="stylesheet" href="../static/css/references.css" />
+    <link rel="stylesheet" href="../static/css/taskbar.css" />
+  </head>
+  <body>
+    <div class="references-container">
+      <h1>Reference Images</h1>
+      <p class="subtitle">Browse captured faces by person.</p>
+
+      <div class="controls">
+        <label for="name-select">Select Person:</label>
+        <select id="name-select">
+          <option value="">-- All --</option>
+        </select>
+      </div>
+
+      <div id="image-count" class="image-count"></div>
+      <div id="image-gallery" class="image-gallery"></div>
+      <div id="no-images" class="no-images" style="display: none;">
+        No reference images found.
+      </div>
+    </div>
+
+    <!-- Bottom Taskbar -->
+    <div class="taskbar-placeholder">
+      <div class="taskbar">
+        <button id="home-button">Home</button>
+        <button id="settings-button">Settings</button>
+      </div>
+    </div>
+
+    <script type="module" src="../static/js/references.js"></script>
+    <script type="module" src="../static/js/taskbar.js"></script>
+  </body>
+</html>

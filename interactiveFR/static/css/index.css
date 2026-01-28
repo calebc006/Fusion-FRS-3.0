@@ -136,10 +136,12 @@
 }
 
 .init-input {
-    width: min(500px, calc(100%));
+    width: 100%;
     margin-top: 1em;
     padding: 0.6em;
     font-size: 1em;
+    box-sizing: border-box;
+    display: block;
 }
 
 .loading-indicator {
@@ -151,14 +153,16 @@
     display: flex;
     align-items: center;
     flex-direction: column;
+    width: 500px;
 }
 
 .form-section {
-    width: 300px;
+    width: 500px;
     margin-bottom: 1em;
 }
 
 .submit-button {
+    margin-top: 30px;
     padding: 0.8em 1.5em;
     background-color: rgb(47, 79, 79);
     border-radius: 1em;

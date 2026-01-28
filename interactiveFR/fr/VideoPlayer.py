@@ -346,7 +346,7 @@ class VideoPlayer:
     
     def end_stream(self) -> None:
         """Ends ffmpeg video stream"""
-        
+        self.is_started = False
         self.end_event.set()
         self._stop_ffmpeg()
 
