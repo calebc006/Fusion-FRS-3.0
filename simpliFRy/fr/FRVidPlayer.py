@@ -8,7 +8,6 @@ import hashlib
 import warnings
 from datetime import datetime, timedelta
 from typing import Generator, TypedDict
-import subprocess
 
 import numpy as np
 from insightface.app import FaceAnalysis
@@ -18,15 +17,8 @@ from tqdm import tqdm
 
 from fr import VideoPlayer
 from sql_db import get_db, recreate_table, fetch_records, save_record
-from utils import calc_iou, log_info
-
-
-def is_cuda_available():
-    try:
-        subprocess.check_output(['nvidia-smi'])
-        return True
-    except (Exception, FileNotFoundError):
-        return False
+from fr.utils import fractionalize_bbox, calc_iou, normalize_embed, is_cuda_available
+from fr.logger import log_info
 
 
 FR_SETTINGS_FP = 'settings.json'
@@ -417,48 +409,7 @@ class FRVidPlayer(VideoPlayer):
             distances.append(nearest_distances.tolist())
         
         return neighbours, distances
-
-    @staticmethod
-    def _fractionalise_bbox(
-        img_width: int, img_height: int, bbox: list[float]
-    ) -> list[float]:
-        """
-        Convert bounding box values to fractions of the image
-
-        Arguments
-        - img_width: width of image (pixels)
-        - img_height: height of image (pixels)
-        - bbox: bounding box in xyxy format (pixels)
-
-        Returns
-        - bounding box in xyxy format (fraction)
-        """
-
-        return [
-            float(bbox[0] / img_width),
-            float(bbox[1] / img_height),
-            float(bbox[2] / img_width),
-            float(bbox[3] / img_height),
-        ]
-
-    @staticmethod
-    def _normalise_embed(embed: np.ndarray) -> np.ndarray:
-        """
-        Normalise embeddings 
-
-        Arguments
-        - embed: raw embedding represenatation of a person's face
-
-        Returns
-        - normalised embedding representation of a person's face
-        """
-
-        # Make sure its type float32
-        embed = np.asarray(embed, dtype=np.float32)
-        norm = np.linalg.norm(embed)
-        if norm == 0:
-            return embed
-        return embed / norm
+    
 
     def _catch_recent(self, embed: np.ndarray, score: np.float32, bbox: list[float]) -> tuple[str, np.ndarray]:
         """
@@ -478,7 +429,7 @@ class FRVidPlayer(VideoPlayer):
         - Normalised embedding of the yet-to-be recognised face
         """
 
-        embed = FRVidPlayer._normalise_embed(embed)
+        embed = normalize_embed(embed)
         max_sim: float = 0
         closest_match = None
 
@@ -605,7 +556,7 @@ class FRVidPlayer(VideoPlayer):
         labels = []
         updated_recent_detections : list[RecentDetection] = []  # Same format as recent_detections
 
-        bboxes = [FRVidPlayer._fractionalise_bbox(
+        bboxes = [fractionalize_bbox(
                     width, height, face["bbox"].tolist()
                 ) for face in faces]
 
@@ -617,7 +568,7 @@ class FRVidPlayer(VideoPlayer):
                 and (dist[1] - dist[0]) > self.fr_settings["similarity_gap"]
             ):
                 name = self.name_list[neighbours[i][0]]
-                latest_embedding = FRVidPlayer._normalise_embed(embeddings_list[i])
+                latest_embedding = normalize_embed(embeddings_list[i])
                 self._log_if(name)
 
             elif self.fr_settings["use_persistor"]:
@@ -745,7 +696,7 @@ class FRVidPlayer(VideoPlayer):
         """
         
         last_results_hash = None
-        min_interval = 0.033  # ~30 FPS max for detection updates (reduces network overhead)
+        min_interval = 0.02  # ~50 FPS max for detection updates (reduces network overhead)
         last_send_time = 0.0
 
         while self.inferenceThread is not None and self.inferenceThread.is_alive():

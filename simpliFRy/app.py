@@ -9,7 +9,7 @@ from flask import Flask, Response, render_template, request, redirect, url_for, 
 from flask_cors import CORS
 
 from fr import FRVidPlayer
-from utils import log_info
+from fr.logger import log_info
 from types import SimpleNamespace
 import atexit
 

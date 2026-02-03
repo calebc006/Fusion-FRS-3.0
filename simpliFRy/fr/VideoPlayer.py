@@ -7,8 +7,7 @@ from typing import Generator
 import numpy as np
 import cv2
 
-from utils import log_info
-
+from fr.logger import log_info
 
 class RWLock:
     """
