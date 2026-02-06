@@ -1,0 +1,247 @@
+import { updateBBoxes } from "./utils.js";
+
+// ───────────────────────────── State ─────────────────────────────────────
+let currData = [],
+    hasTarget = false;
+
+const $ = (id) => document.getElementById(id);
+const detectionList = $("table-detection-list");
+const captureTarget = $("capture-target");
+const captureHeader = document.querySelector(".capture-header");
+const captureInput = $("capture-name");
+const captureBtn = $("capture-button");
+const referencesPanelBtn = $("references-panel-button");
+const captureToast = $("capture-toast");
+
+// ───────────────────────────── Init ──────────────────────────────────────
+window.addEventListener("DOMContentLoaded", async () => {
+    try {
+        const res = await fetch("/checkAlive");
+        if ((await res.text()) !== "Yes") {
+            alert("Stream not started. Please start from Home.");
+            return (window.location.href = "/");
+        }
+
+        $("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
+
+        const srcLabel = $("stream-source");
+        if (srcLabel) {
+            srcLabel.textContent = localStorage.getItem("streamSrc") || "";
+        }
+
+        fetchDetections();
+    } catch {
+        alert("Unable to connect to server.");
+        window.location.href = "/";
+    }
+});
+
+// ───────────────────────────── Main Loop ─────────────────────────────────
+async function fetchDetections() {
+    let buffer = "";
+
+    try {
+        const res = await fetch("/frResults");
+        if (!res.ok || !res.body) throw new Error();
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n");
+
+            try {
+                if (parts.length > 1) {
+                    const data = JSON.parse(parts.at(-2))?.data || [];
+                    currData = updateBBoxes($("video-container"), data, {
+                        showLabels: true,
+                        showUnknown: true,
+                    });
+                    updateDetectionList(data);
+                    updateCapturePanel(data);
+                }
+            } catch {}
+
+            buffer = parts.at(-1) || "";
+        }
+    } catch (e) {
+        console.error("Fetch error:", e);
+    }
+
+    setTimeout(fetchDetections, 2000);
+}
+
+function updateDetectionList(data) {
+    const seen = new Set();
+    const els = [];
+
+    data.forEach((d) => {
+        const label = d.label?.toUpperCase();
+        if (!label || label === "UNKNOWN" || seen.has(label)) return;
+        seen.add(label);
+
+        const el = document.createElement("div");
+        el.className = "table-detection-element";
+        el.dataset.name = label;
+        el.innerHTML = `<span class="detection-name">${label}</span>`;
+        els.push(el);
+    });
+
+    els.sort((a, b) =>
+        (a.dataset.name || "").localeCompare(b.dataset.name || ""),
+    );
+    detectionList.replaceChildren(...els);
+}
+
+function updateCapturePanel(data) {
+    hasTarget = data.some((d) => d.is_target);
+    captureTarget.textContent = hasTarget ? "Ready" : "None";
+    captureBtn.disabled = !hasTarget || !captureInput.value.trim();
+    captureHeader?.classList.toggle("is-ready", hasTarget);
+}
+
+// ───────────────────────────── Capture ───────────────────────────────────
+captureInput.addEventListener(
+    "input",
+    () => (captureBtn.disabled = !hasTarget || !captureInput.value.trim()),
+);
+
+const showCaptureToast = (message, type = "info") => {
+    if (!captureToast) return;
+    captureToast.textContent = message;
+    captureToast.classList.remove("is-success", "is-error", "is-info");
+    captureToast.classList.add(`is-${type}`);
+    captureToast.classList.add("show");
+    clearTimeout(showCaptureToast._timer);
+    showCaptureToast._timer = setTimeout(() => {
+        captureToast.classList.remove("show");
+    }, 3000);
+};
+
+captureBtn.addEventListener("click", async () => {
+    const name = captureInput.value.trim();
+    if (!name) return showCaptureToast("Enter a name first.", "error");
+
+    captureBtn.disabled = true;
+    showCaptureToast("Capturing...", "info");
+
+    try {
+        const res = await fetch("/capture", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+        });
+        const result = await res.json();
+        showCaptureToast(
+            result.message || "Done.",
+            result.ok ? "success" : "error",
+        );
+        if (result.ok) captureInput.value = "";
+    } catch {
+        showCaptureToast("Capture failed.", "error");
+    }
+});
+
+// ───────────────────────────── References Modal ──────────────────────────
+const modal = $("references-modal");
+const openReferencesPage = $("open-references-page");
+const nameSelect = $("name-select");
+const gallery = $("image-gallery");
+const imgCount = $("image-count");
+const noImgs = $("no-images");
+const lightbox = $("lightbox");
+const lightboxImg = lightbox?.querySelector("img");
+
+let refData = [];
+
+referencesPanelBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    modal.classList.remove("hidden");
+    loadReferences();
+});
+
+openReferencesPage?.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.open("/references", "_blank");
+});
+
+$("close-references-modal")?.addEventListener("click", () =>
+    modal.classList.add("hidden"),
+);
+modal
+    ?.querySelector(".modal-overlay")
+    ?.addEventListener("click", () => modal.classList.add("hidden"));
+
+async function loadReferences() {
+    try {
+        refData = await (await fetch("/api/reference_images")).json();
+        nameSelect.innerHTML = '<option value="">-- All --</option>';
+
+        if (!refData.length) {
+            noImgs.style.display = "block";
+            gallery.innerHTML = "";
+            imgCount.textContent = "";
+            return;
+        }
+
+        noImgs.style.display = "none";
+        refData.forEach((p) => {
+            const opt = document.createElement("option");
+            opt.value = p.name;
+            opt.textContent = `${p.name} (${p.images.length})`;
+            nameSelect.appendChild(opt);
+        });
+        showImages();
+    } catch (e) {
+        console.error(e);
+        noImgs.textContent = "Error loading images.";
+        noImgs.style.display = "block";
+    }
+}
+
+function showImages(name = null) {
+    gallery.innerHTML = "";
+    const people = name ? refData.filter((p) => p.name === name) : refData;
+    let total = 0;
+
+    people.forEach((p) =>
+        p.images.forEach((src) => {
+            const card = document.createElement("div");
+            card.className = "image-card";
+            card.innerHTML = `<img src="${src}" alt="${p.name}" loading="lazy"><div class="image-name">${src.split("/").pop()}</div>`;
+            card.addEventListener("click", () => {
+                lightboxImg.src = src;
+                lightbox.classList.add("active");
+            });
+            gallery.appendChild(card);
+            total++;
+        }),
+    );
+
+    imgCount.textContent = name
+        ? `${total} images for "${name}"`
+        : `${total} images from ${refData.length} people`;
+}
+
+nameSelect?.addEventListener("change", (e) =>
+    showImages(e.target.value || null),
+);
+
+// Lightbox close
+lightbox
+    ?.querySelector(".lightbox-close")
+    ?.addEventListener("click", () => lightbox.classList.remove("active"));
+lightbox?.addEventListener(
+    "click",
+    (e) => e.target === lightbox && lightbox.classList.remove("active"),
+);
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        lightbox.classList.remove("active");
+        modal.classList.add("hidden");
+    }
+});

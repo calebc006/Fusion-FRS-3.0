@@ -88,7 +88,7 @@ body {
 }
 
 .bbox-label {
-    font-size: 100%;
+    font-size: 18px;
     font-weight: bold;
     color: red;
     position: absolute;
@@ -105,10 +105,16 @@ body {
 
 .bbox-label-identified {
     color: blue;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 .bbox-label-target {
     color: #00d06c;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 .bbox-score {

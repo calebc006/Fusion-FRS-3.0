@@ -492,7 +492,7 @@ class FRVidPlayer(VideoPlayer):
                 max_sim = similarity
                 closest_match = recent_detection["name"]
 
-        if max_sim/512 > (1-self.fr_settings["threshold_prev"]) and (score < self.fr_settings['threshold_lenient_pers']):
+        if max_sim > (1-self.fr_settings["threshold_prev"]) and (score < self.fr_settings['threshold_lenient_pers']):
             return (closest_match, embed)
 
         return ("Unknown", embed)

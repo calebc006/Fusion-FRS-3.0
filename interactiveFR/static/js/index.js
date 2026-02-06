@@ -1,29 +1,55 @@
-const customInput = document.getElementById("stream_src_custom");
-const webcamInput = document.getElementById("webcam_device");
+const customRTSP = document.getElementById("stream_src_custom");
+const cameraSelect = document.getElementById("camera_device_select");
 const form = document.getElementById("init");
-const infoMenu = document.getElementById("info-menu");
-let namelistPath = null;
+let isEndingStream = false;
 
 window.addEventListener("DOMContentLoaded", async () => {
     fetch("/checkAlive")
         .then((response) => response.text())
         .then((data) => {
             if (data === "Yes") {
-                // Hide form and show post-init menu
-                form.style.display = "none";
-                infoMenu.style.display = "flex";
-                document.getElementById("stream-url").textContent =
-                    localStorage.getItem("streamSrc") || "N/A";
-                document.getElementById("namelist-path").textContent =
-                    localStorage.getItem("namelistPath") || "N/A";
-            } else {
-                // Hide post-init menu and show form
-                infoMenu.style.display = "none";
-                form.style.display = "flex";
+                window.location.href = "/interactive";
             }
         })
         .catch((error) => console.log(error));
 });
+
+const endStreamAndReload = async () => {
+    if (isEndingStream) {
+        return;
+    }
+    isEndingStream = true;
+    try {
+        await fetch("/end", { method: "POST" });
+    } catch {}
+    localStorage.removeItem("namelistPath");
+    localStorage.removeItem("streamSrc");
+    location.reload();
+};
+
+const resolveStreamSource = () => {
+    const selection = streamSelectElem.value;
+
+    if (selection === "custom") {
+        const rtspValue = customRTSP.value.trim();
+        if (!rtspValue || !rtspValue.toUpperCase().startsWith("RTSP://")) {
+            alert("Please enter a valid custom RTSP URL.");
+            return null;
+        }
+        return rtspValue;
+    }
+
+    if (selection === "camera") {
+        const device = cameraSelect.value;
+        if (!device) {
+            alert("Please select a camera device.");
+            return null;
+        }
+        return `camera:${device}`;
+    }
+
+    return streamSelectElem.value;
+};
 
 // ------------ Init form ---------------
 
@@ -32,19 +58,15 @@ document.getElementById("init").onsubmit = async (event) => {
     event.preventDefault();
 
     const form = event.target;
-    const formData = new FormData(form);
-
-    // Set namelist path if provided
-    const dataFile = formData.get("data_file");
-    if (dataFile) {
-        namelistPath = `./data/${dataFile}`;
-        localStorage.setItem("namelistPath", namelistPath);
-    } else {
-        localStorage.removeItem("namelistPath");
+    const streamSrc = resolveStreamSource();
+    if (!streamSrc) {
+        return;
     }
 
+    const formData = new FormData(form);
+    formData.set("stream_src", streamSrc);
+
     // Store stream source
-    const streamSrc = formData.get("stream_src");
     localStorage.setItem("streamSrc", streamSrc);
 
     // Remove submit button and create loading indicator
@@ -53,9 +75,17 @@ document.getElementById("init").onsubmit = async (event) => {
 
     const loader = document.createElement("h4");
     loader.classList.add("loading-indicator");
-    let intervalId = createLoadingAnimation("Loading embeddings", loader);
 
     form.appendChild(loader);
+
+    let addSubmitButton = () => {
+        const newSubmit = document.createElement("input");
+        newSubmit.type = "submit";
+        newSubmit.id = "submit-button";
+        newSubmit.className = "submit-button";
+        newSubmit.value = "Submit";
+        form.appendChild(newSubmit);
+    };
 
     // Load embeddings then start stream
     fetch(`/start`, {
@@ -64,25 +94,52 @@ document.getElementById("init").onsubmit = async (event) => {
     })
         .then((response) => response.json())
         .then((data) => {
-            // Replace loading animation with "Starting stream..."
-            clearInterval(intervalId);
-            intervalId = createLoadingAnimation("Starting stream", loader);
+            // Create loading animation with "Starting stream..."
+            let intervalId = createLoadingAnimation("Starting stream", loader);
 
             if (data.stream) {
                 console.log("Stream started!");
 
-                // Hide form, loader and show post-init menu
+                // Brief delay then verify stream is still alive before redirecting
+                clearInterval(intervalId);
+                intervalId = createLoadingAnimation("Verifying stream", loader);
+
+                setTimeout(async () => {
+                    try {
+                        const aliveRes = await fetch("/checkAlive");
+                        const alive = await aliveRes.text();
+                        clearInterval(intervalId);
+                        loader.remove();
+
+                        if (alive === "Yes") {
+                            form.style.display = "none";
+                            window.location.href = "/interactive";
+                        } else {
+                            alert(
+                                "Stream failed shortly after starting. Please check your source and try again.",
+                            );
+                            addSubmitButton();
+                        }
+                    } catch {
+                        clearInterval(intervalId);
+                        loader.remove();
+                        addSubmitButton();
+                    }
+                }, 1500);
+            } else {
                 clearInterval(intervalId);
                 loader.remove();
-                form.style.display = "none";
-                infoMenu.style.display = "flex";
-                document.getElementById("stream-url").textContent =
-                    localStorage.getItem("streamSrc") || "N/A";
-                document.getElementById("namelist-path").textContent =
-                    localStorage.getItem("namelistPath") || "N/A";
-            } else {
                 alert(data.message);
+
+                // Re-add the submit button so user can retry
+                addSubmitButton();
             }
+        })
+        .catch(() => {
+            alert(`Error loading stream from ${streamSrc}. Please try again.`);
+
+            // Re-add the submit button so user can retry
+            addSubmitButton();
         });
 };
 
@@ -99,192 +156,86 @@ const createLoadingAnimation = (text, loaderEl) => {
 
 // Handles stream selection
 const streamSelectElem = document.getElementById("stream_src_select");
-streamSelectElem.addEventListener("change", function () {
-    if (this.value === "custom") {
-        // Hide the select's name to prevent duplicate keys
-        streamSelectElem.removeAttribute("name");
 
-        // Show and enable the custom input
-        customInput.style.display = "block";
-        customInput.setAttribute("required", "required");
-        customInput.setAttribute("name", "stream_src");
-
-        // Hide webcam input
-        webcamInput.style.display = "none";
-        webcamInput.removeAttribute("required");
-        webcamInput.removeAttribute("name");
-        webcamInput.value = "";
-    } else if (this.value === "webcam") {
-        // Hide the select's name to prevent duplicate keys
-        streamSelectElem.removeAttribute("name");
-
-        // Show webcam input (optional)
-        webcamInput.style.display = "block";
-        webcamInput.setAttribute("name", "stream_src");
-
-        // Hide and disable the custom input
-        customInput.style.display = "none";
-        customInput.removeAttribute("required");
-        customInput.removeAttribute("name");
-        customInput.value = "";
-    } else {
-        // Restore name to select
-        streamSelectElem.setAttribute("name", "stream_src");
-
-        // Hide and disable the custom input
-        customInput.style.display = "none";
-        customInput.removeAttribute("required");
-        customInput.removeAttribute("name");
-        customInput.value = ""; // Clear out stale value
-
-        // Hide and disable webcam input
-        webcamInput.style.display = "none";
-        webcamInput.removeAttribute("required");
-        webcamInput.removeAttribute("name");
-        webcamInput.value = "";
+const hideInput = (inputEl, { clear = true, required = false } = {}) => {
+    inputEl.style.display = "none";
+    inputEl.removeAttribute("name");
+    if (required) {
+        inputEl.removeAttribute("required");
     }
-});
-
-// ------------ Drag/Drop File Handling ---------------
-
-const dropZone = document.getElementById("drop-zone");
-const fileButton = document.getElementById("file-button");
-const dataFileInput = document.getElementById("data_file");
-const fileNameDisplay = document.getElementById("file-name");
-let selectedFileName = "";
-
-// Handle file button click
-fileButton.addEventListener("click", (e) => {
-    e.preventDefault();
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            handleFileSelection(file.name);
-        }
-    };
-    input.click();
-});
-
-// Handle drag over
-dropZone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.add("dragover");
-});
-
-// Handle drag leave
-dropZone.addEventListener("dragleave", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("dragover");
-});
-
-// Handle drop
-dropZone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("dragover");
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        const file = files[0];
-        if (file.name.endsWith(".json")) {
-            handleFileSelection(file.name);
-        } else {
-            alert("Please drop a .json file");
-        }
+    if (clear) {
+        inputEl.value = "";
     }
-});
-
-// Handle file selection
-const handleFileSelection = (fileName) => {
-    selectedFileName = fileName;
-    dataFileInput.value = fileName;
-    fileNameDisplay.textContent = `Selected: ${fileName}`;
 };
 
-// Optional: Form validation reminder
-form.addEventListener("submit", function (e) {
-    if (streamSelectElem.value === "custom" && !customInput.value.trim()) {
-        e.preventDefault();
-        alert("Please enter a valid custom RTSP URL.");
+const showInput = (inputEl, { required = false } = {}) => {
+    inputEl.style.display = "block";
+    inputEl.setAttribute("name", "stream_src");
+    if (required) {
+        inputEl.setAttribute("required", "required");
+    }
+};
+
+const inputConfigBySelection = {
+    custom: { input: customRTSP, required: true },
+    camera: { input: cameraSelect, required: true },
+};
+
+const fetchCameras = async () => {
+    cameraSelect.innerHTML =
+        '<option value="" disabled selected>Detecting cameras...</option>';
+    try {
+        const response = await fetch("/listCameras");
+        const cameras = await response.json();
+
+        cameraSelect.innerHTML = "";
+
+        if (cameras.length === 0) {
+            cameraSelect.innerHTML =
+                '<option value="" disabled selected>No cameras detected</option>';
+            return;
+        }
+
+        cameras.forEach((name) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            cameraSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.log(error);
+        cameraSelect.innerHTML =
+            '<option value="" disabled selected>Error detecting cameras</option>';
+    }
+};
+
+const updateStreamSourceUI = () => {
+    const selection = streamSelectElem.value;
+
+    hideInput(customRTSP, { required: true });
+    hideInput(cameraSelect, { clear: false });
+
+    const config = inputConfigBySelection[selection];
+    if (config) {
+        streamSelectElem.removeAttribute("name");
+        showInput(config.input, { required: config.required });
+
+        if (selection === "camera") {
+            fetchCameras();
+        }
+        return;
     }
 
-    if (streamSelectElem.value === "webcam") {
-        const deviceName = webcamInput.value.trim();
-        webcamInput.value = deviceName ? `webcam:${deviceName}` : "webcam";
-    }
-});
+    streamSelectElem.setAttribute("name", "stream_src");
+};
+
+streamSelectElem.addEventListener("change", updateStreamSourceUI);
+updateStreamSourceUI();
 
 // Handle taskbar button to end stream
 document
     .getElementById("reset-button")
     .addEventListener("click", async (event) => {
         event.preventDefault();
-
-        fetch("/end", {
-            method: "POST",
-        })
-            .then((response) => response.json())
-            .then((_data) => {
-                localStorage.removeItem("namelistPath");
-                localStorage.removeItem("streamSrc");
-                location.reload();
-            });
+        endStreamAndReload();
     });
-
-// -------- VIDEO MODAL STUFF ----------
-const videoModal = document.getElementById("video-modal");
-const videoContainer = document.getElementById("video-container");
-
-// Handle resizing of modal
-window.addEventListener("resize", () => {
-    const videoContainer = document.getElementById("video-container");
-    const bboxesEl = videoContainer.querySelectorAll(".bbox");
-    bboxesEl.forEach((element, idx) => {
-        setBBoxPos(
-            element,
-            currData[idx],
-            videoContainer.offsetWidth,
-            videoContainer.offsetHeight,
-        );
-    });
-});
-
-const showVideoModal = () => {
-    videoModal.classList.remove("hidden");
-};
-
-const hideVideoModal = () => {
-    videoModal.classList.add("hidden");
-};
-
-// Handles taskbar button to open video modal
-const openVideoModalButton = document.getElementById("open-video-modal-button");
-if (openVideoModalButton) {
-    openVideoModalButton.addEventListener("click", () => {
-        const videoFeed = document.getElementById("video-feed");
-        videoFeed.setAttribute("data", `/vidFeed?t=${Date.now()}`);
-
-        showVideoModal();
-    });
-}
-
-// Close video model button
-document.getElementById("close-video-modal").addEventListener("click", (e) => {
-    hideVideoModal();
-    const videoFeed = document.getElementById("video-feed");
-    videoFeed.removeAttribute("data");
-});
-
-// Close video modal on Escape key
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !videoModal.classList.contains("hidden")) {
-        hideVideoModal();
-        const videoFeed = document.getElementById("video-feed");
-        videoFeed.removeAttribute("data");
-    }
-});

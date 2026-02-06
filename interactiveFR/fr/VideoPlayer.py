@@ -42,100 +42,100 @@ class RWLock:
         self._read_ready.release()
 
 
-class VideoPlayer:
-    """
-    Class for streaming video from ffmpeg
-    """
 
-    def __init__(self) -> None:
-        """Initialises the class"""
+class VideoSource:
+    '''
+    Class to build ffmpeg command based on video source string
+    '''
+    
+    def __init__(self, source: str, width: int, height: int) -> None:
+        self.source = source
+        self.width = width
+        self.height = height
+    
+    @staticmethod
+    def list_cameras() -> list[str]:
+        '''
+        List available camera device names on the system.
+        Returns a list of device name strings.
+        '''
+        if sys.platform.startswith("win"):
+            try:
+                result = subprocess.run(
+                    ["ffmpeg", "-f", "dshow", "-list_devices", "true", "-i", "dummy"],
+                    capture_output=True, text=True, timeout=5
+                )
+                lines = result.stderr.split('\n')
+                video_devices = []
+                for line in lines:
+                    if '(video)' in line and '"' in line:
+                        start = line.find('"') + 1
+                        end = line.find('"', start)
+                        if start > 0 and end > start:
+                            name = line[start:end]
+                            if not name.startswith('@'):
+                                video_devices.append(name)
+                log_info(f"Detected {len(video_devices)} camera(s): {video_devices}")
+                return video_devices
+            except Exception as e:
+                log_info(f"Error listing cameras: {e}")
+                return []
+        else:
+            # Linux/macOS: list /dev/video* devices
+            import glob
+            devices = sorted(glob.glob("/dev/video*"))
+            log_info(f"Detected {len(devices)} camera(s): {devices}")
+            return devices
 
-        # For modifiables
-        self.vid_lock = RWLock()  # RWLock for concurrent read access
-        self.frame_bytes = b"" 
-        self.frame_id = 0 # Counter to track new frames
-        self.perf_logging = False
-        self.ffmpeg_process = None
-        self.streamThread = None
-        self.inferenceThread = None
+    def _get_windows_camera_device_name(self, camera_index: int) -> str | None:
+        '''
+        Get the Windows camera device name by index using DirectShow. 
+        If index is out of range, return the first device detected. If no devices found, return None.
+        '''
 
-        # Thread event
-        self.end_event = threading.Event()
-
-        # Set resolution of input video
-        self.width = 1280
-        self.height = 720
-
-        # Printing
-        self.in_error = False
-
-        # Check if ffmpeg has been initialised (used to block secondary requests)
-        self.is_started = False
-
-        log_info("Video Player initialised!")
-        pass
-
-    def _handle_stream_end(self) -> None:
-        log_info("ENDING FFMPEG SUBPROCESS")
-        self.is_started = False
-
-    def _handleRTSP(self, stream_src:str) -> None:
-        """
-        Opens ffmpeg subprocess and processes the frame to bytes
+        # Don't force video_size/framerate - let FFmpeg auto-detect camera capabilities
+        # and scale output to desired resolution
+        device_name = None
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-f", "dshow", "-list_devices", "true", "-i", "dummy"],
+                capture_output=True, text=True, timeout=5
+            )
+            # Parse stderr for video devices (device names appear after [dshow])
+            lines = result.stderr.split('\n')
+            video_devices = []
+            for line in lines:
+                # Look for lines with "(video)" to identify video devices
+                if '(video)' in line and '"' in line:
+                    # Extract device name between quotes
+                    start = line.find('"') + 1
+                    end = line.find('"', start)
+                    if start > 0 and end > start:
+                        name = line[start:end]
+                        # Skip alternative names (they start with @)
+                        if not name.startswith('@'):
+                            video_devices.append(name)
+                            log_info(f"Found video device: {name}")
+            
+            log_info(f"Found {len(video_devices)} video devices: {video_devices}")
+            
+            if camera_index < len(video_devices):
+                device_name = video_devices[camera_index]
+            elif video_devices:
+                device_name = video_devices[0]
+                log_info(f"Camera index {camera_index} out of range, using: {device_name}")
+            
+            return device_name
         
-        Arguments
-        - stream_src: url to RTSP video stream or source to VCC
-        """
+        except Exception as e:
+            log_info(f"Error listing DirectShow devices: {e}")
+            return None
 
-        log_info(f"Starting FFmpeg stream from: {stream_src}")
+    def build_ffmpeg_command(self, src: str) -> list[str]:
+        src = (src or "").strip()
 
-        def _build_ffmpeg_command(src: str) -> list[str]:
-            src = (src or "").strip()
-
-            if src.lower().startswith("webcam"):
-                device = ""
-                if ":" in src:
-                    device = src.split(":", 1)[1].strip()
-
-                if sys.platform.startswith("win"):
-                    # Windows (DirectShow). Device name can be provided via "webcam:<device name>".
-                    if not device:
-                        device = "default"
-                    input_arg = f"video={device}"
-                    return [
-                        "ffmpeg",
-                        "-f", "dshow",
-                        "-video_size", f"{self.width}x{self.height}",
-                        "-framerate", "25",
-                        "-i", input_arg,
-                        "-vf", f"fps=25, scale={self.width}:{self.height}",
-                        "-an",
-                        "-sn",
-                        "-f", "rawvideo",
-                        "-pix_fmt", "rgb24",
-                        "-buffer_size", "64k",
-                        "pipe:1",
-                    ]
-                else:
-                    # Linux/macOS fallback (v4l2). Device defaults to /dev/video0
-                    if not device:
-                        device = "/dev/video0"
-                    return [
-                        "ffmpeg",
-                        "-f", "v4l2",
-                        "-video_size", f"{self.width}x{self.height}",
-                        "-framerate", "25",
-                        "-i", device,
-                        "-vf", f"fps=25, scale={self.width}:{self.height}",
-                        "-an",
-                        "-sn",
-                        "-f", "rawvideo",
-                        "-pix_fmt", "rgb24",
-                        "-buffer_size", "64k",
-                        "pipe:1",
-                    ]
-
-            # Default: RTSP/IP camera
+        # Default: RTSP/IP camera
+        if src.upper().startswith("RTSP://"):
             return [
                 "ffmpeg",
 
@@ -170,9 +170,102 @@ class VideoPlayer:
                 # Output to stdout
                 "pipe:1",
             ]
+        
+        # Camera device (starts with 'camera:')
+        if src.startswith("camera:"):
+            device_name = src.split(":", 1)[1].strip()
 
-        command = _build_ffmpeg_command(stream_src)
+            if not device_name:
+                log_info("No camera device name provided")
+                return None
 
+            if sys.platform.startswith("win"):
+                log_info(f"Using DirectShow camera: {device_name}")
+                return [
+                    "ffmpeg",
+                    "-f", "dshow",
+                    "-video_size", f"{self.width}x{self.height}",
+                    "-vcodec", "mjpeg",
+                    "-i", f"video={device_name}",
+                    "-vf", "fps=25",
+                    "-an",
+                    "-sn",
+                    "-f", "rawvideo",
+                    "-pix_fmt", "rgb24",
+                    "-buffer_size", "64k",
+                    "pipe:1",
+                ]
+            else:
+                log_info(f"Using v4l2 camera: {device_name}")
+                return [
+                    "ffmpeg",
+                    "-f", "v4l2",
+                    "-i", device_name,
+                    "-vf", f"scale={self.width}:{self.height}",
+                    "-r", "25",
+                    "-an",
+                    "-sn",
+                    "-f", "rawvideo",
+                    "-pix_fmt", "rgb24",
+                    "-buffer_size", "64k",
+                    "pipe:1",
+                ]
+
+        
+
+class VideoPlayer:
+    """
+    Class for streaming video from ffmpeg
+    """
+
+    def __init__(self) -> None:
+        """Initialises the class"""
+
+        # For modifiables
+        self.vid_lock = RWLock()  # RWLock for concurrent read access
+        self.frame_bytes = b"" 
+        self.frame_id = 0 # Counter to track new frames
+        self.perf_logging = False
+        self.ffmpeg_process = None
+        self.streamThread = None
+        self.inferenceThread = None
+
+        # Thread event
+        self.end_event = threading.Event()
+
+        # Set resolution of input video
+        self.width = 1280
+        self.height = 720
+
+        # Printing
+        self.in_error = False
+
+        # Check if ffmpeg has been initialised (used to block secondary requests)
+        self.is_started = False
+
+        self.video_source = None
+
+        log_info("Video Player initialised!")
+        pass
+
+    def _handle_stream_end(self) -> None:
+        log_info("ENDING FFMPEG SUBPROCESS")
+        self.is_started = False
+
+    def _handleFFmpegStream(self, stream_src:str) -> None:
+        """
+        Opens ffmpeg subprocess and processes the frame to bytes
+        
+        Arguments
+        - stream_src: url to RTSP video stream or source to VCC
+        """
+
+        log_info(f"Starting FFmpeg stream from: {stream_src}")
+
+        self.video_source = VideoSource(stream_src, self.width, self.height)
+        command = self.video_source.build_ffmpeg_command(stream_src)
+
+        log_info(f"FFmpeg command: {command}")
 
         try:
             ffmpeg_process = subprocess.Popen(
@@ -276,17 +369,16 @@ class VideoPlayer:
                 if frames_processed == 1:
                     log_info("Successfully processed first RGB frame from FFmpeg stream")
 
-        else:
-            self._handle_stream_end()
+        self._handle_stream_end()
 
-            # ffmpeg_process.stdout.close()  # Closing stdout terminates FFmpeg sub-process.
-            if ffmpeg_process.poll() is None:
-                ffmpeg_process.terminate()
-                try:
-                    ffmpeg_process.wait(timeout=2)  # Wait for FFmpeg sub-process to finish
-                except subprocess.TimeoutExpired:
-                    ffmpeg_process.kill()
-            return
+        # ffmpeg_process.stdout.close()  # Closing stdout terminates FFmpeg sub-process.
+        if ffmpeg_process.poll() is None:
+            ffmpeg_process.terminate()
+            try:
+                ffmpeg_process.wait(timeout=2)  # Wait for FFmpeg sub-process to finish
+            except subprocess.TimeoutExpired:
+                ffmpeg_process.kill()
+        return
 
     def _stop_ffmpeg(self) -> None:
         """Terminate ffmpeg process safely and close pipes"""
@@ -315,7 +407,28 @@ class VideoPlayer:
         """Sets event to trigger termination of ffmpeg subprocess"""
 
         log_info("CLEANING UP...")
-        self.end_stream()
+        self._shutdown_stream(force_exit=True)
+        return None
+
+    def _shutdown_stream(self, force_exit: bool = False) -> None:
+        """Centralized shutdown for stream threads and ffmpeg process."""
+
+        self.is_started = False
+        self.end_event.set()
+        self._stop_ffmpeg()
+
+        # Join threads briefly to allow clean exit
+        try:
+            if self.streamThread and self.streamThread.is_alive():
+                self.streamThread.join(timeout=1)
+            if self.inferenceThread and self.inferenceThread.is_alive():
+                self.inferenceThread.join(timeout=1)
+        except Exception:
+            pass
+
+        if not force_exit:
+            return None
+
         time.sleep(0.5)
         # Final safety: exit if anything lingers
         try:
@@ -334,10 +447,9 @@ class VideoPlayer:
         - stream_src: url to RTSP video stream or source to VCC
         """
 
-        log_info(f"start_stream called with source: {stream_src}")
         self.is_started = True
         self.end_event = threading.Event()
-        self.streamThread = threading.Thread(target=self._handleRTSP, args=(stream_src,))
+        self.streamThread = threading.Thread(target=self._handleFFmpegStream, args=(stream_src,))
         self.streamThread.daemon = True
         self.streamThread.start()
         log_info(f"Stream thread started. Thread alive: {self.streamThread.is_alive()}")
@@ -346,20 +458,7 @@ class VideoPlayer:
     
     def end_stream(self) -> None:
         """Ends ffmpeg video stream"""
-        
-        self.end_event.set()
-        self._stop_ffmpeg()
-
-        # Join threads briefly to allow clean exit
-        try:
-            if self.streamThread and self.streamThread.is_alive():
-                self.streamThread.join(timeout=1)
-            if self.inferenceThread and self.inferenceThread.is_alive():
-                self.inferenceThread.join(timeout=1)
-        except Exception:
-            pass
-        
-        return None
+        return self._shutdown_stream(force_exit=False)
         
     def start_broadcast(self) -> Generator[bytes, any, any]:
         """

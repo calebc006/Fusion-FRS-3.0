@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive FR</title>
+    <link rel="icon" href="../static/images/fusionlogo.png" />
+    <link rel="stylesheet" href="../static/css/main.css" />
+    <link rel="stylesheet" href="../static/css/taskbar.css" />
+    <link rel="stylesheet" href="../static/css/interactive.css" />
+  </head>
+  <body>
+    <!-- Video feed goes here -->
+    <div id="video-container">
+      <object id="video-feed" type="image/jpeg">
+        <img src="../static/images/default.jpg" alt="default video image" />
+      </object>
+    </div>
+
+    <!-- Detection list goes here -->
+    <div class="table-detection-list" id="table-detection-list"></div>
+
+    <!-- Capture panel -->
+    <div id="capture-panel">
+      <div class="capture-header">
+        <div class="capture-title" id="capture-title">Register New Face</div>
+        <div class="capture-status">
+          Target: <span id="capture-target" class="capture-target">None</span>
+        </div>
+      </div>
+      <input
+        id="capture-name"
+        type="text"
+        placeholder="Enter name"
+        autocomplete="off"
+      />
+      <button id="capture-button" disabled>Capture</button>
+      <button id="references-panel-button" class="secondary-button">
+        References
+      </button>
+    </div>
+
+    <div
+      id="capture-toast"
+      class="capture-toast"
+      role="status"
+      aria-live="polite"
+    ></div>
+
+    <!-- Logos -->
+    <div class="flex-container-logo">
+      <img src="../static/images/armylogo.png" />
+      <img src="../static/images/11logo.png" />
+      <img class="fusion-logo" src="../static/images/fusionlogo.png" />
+    </div>
+
+    <!-- References Modal -->
+    <div id="references-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content references-modal-content">
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h2>Reference Images</h2>
+            <button
+              id="open-references-page"
+              class="icon-button"
+              aria-label="Open references page"
+              title="Open references page"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z"
+                ></path>
+                <path d="M5 5h6v2H7v10h10v-4h2v6H5V5z"></path>
+              </svg>
+            </button>
+          </div>
+          <div>
+            <button id="close-references-modal" class="modal-close">
+              &times;
+            </button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="controls">
+            <label for="name-select">Select Person:</label>
+            <select id="name-select">
+              <option value="">-- All --</option>
+            </select>
+          </div>
+          <div id="image-count" class="image-count"></div>
+          <div id="image-gallery" class="image-gallery"></div>
+          <div id="no-images" class="no-images" style="display: none">
+            No reference images found.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lightbox for full-size image -->
+    <div id="lightbox" class="lightbox">
+      <span class="lightbox-close">&times;</span>
+      <img src="" alt="Full size" />
+    </div>
+
+    <!-- Stream source label -->
+    <div id="stream-source" class="stream-source"></div>
+
+    <!-- Bottom Taskbar -->
+    <div class="taskbar-placeholder">
+      <div class="taskbar">
+        <button id="reset-button">Reset</button>
+        <button id="settings-button">Settings</button>
+      </div>
+    </div>
+
+    <script type="module" src="../static/js/interactive.js"></script>
+    <script type="module" src="../static/js/taskbar.js"></script>
+  </body>
+</html>

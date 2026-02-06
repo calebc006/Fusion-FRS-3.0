@@ -136,14 +136,15 @@
 }
 
 .init-input {
-    width: min(500px, calc(100%));
+    width: min(640px, 92vw);
     margin-top: 1em;
     padding: 0.6em;
     font-size: 1em;
+    box-sizing: border-box;
 }
 
 .loading-indicator {
-    margin: 0px;
+    margin-top: 20px;
     color: dimgray;
 }
 
@@ -151,6 +152,11 @@
     display: flex;
     align-items: center;
     flex-direction: column;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    padding: 2em 2.5em;
+    border-radius: 1.2em;
 }
 
 .form-section {
@@ -159,6 +165,7 @@
 }
 
 .submit-button {
+    margin-top: 20px;
     padding: 0.8em 1.5em;
     background-color: rgb(47, 79, 79);
     border-radius: 1em;
@@ -171,21 +178,25 @@
     cursor: pointer;
 }
 
-input {
+input,
+select.init-input {
     padding: 0.3em;
     border-radius: 0.5em;
     border-width: 0;
     background-color: rgb(50, 50, 50);
     color: var(--color-foreground);
-    opacity: 0.5;
+    opacity: 0.95;
+    box-sizing: border-box;
 }
 
-input:hover {
+input:hover,
+select.init-input:hover {
     opacity: 1;
 }
 
 @media (prefers-color-scheme: light) {
-    input {
+    input,
+    select.init-input {
         background-color: rgb(240, 240, 240);
     }
 

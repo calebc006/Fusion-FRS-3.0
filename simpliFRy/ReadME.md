@@ -10,6 +10,7 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [Pages](#pages)
+
 ---
 
 ## Description
@@ -24,6 +25,8 @@ If you are a developer and would like to understand more about how simpliFRy wor
 
 ### Prerequisites
 
+- [Python 3.10](https://www.python.org/downloads/)
+- [FFmpeg 8.0.1](https://www.ffmpeg.org/download.html)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) (for GPU usage within docker container, which is very recommended; install via WSL)
 
@@ -31,20 +34,20 @@ If you are a developer and would like to understand more about how simpliFRy wor
 
 1. Clone the repository:
 
-   ```bash
-   git clone https://github.com/CJBuzz/Real-time-FRS-2.0.git
-   ```
+    ```bash
+    git clone https://github.com/calebc006/Fusion-FRS-3.0.git
+    ```
 
 2. Navigate to simpliFRy directory
 
-   ```bash
-   cd simpliFRy
-   ```
+    ```bash
+    cd simpliFRy
+    ```
 
 3. Build Docker Image
-   ```bash
-   docker compose build
-   ```
+    ```bash
+    docker compose build
+    ```
 
 ### Installation by other means
 
@@ -97,16 +100,16 @@ If you want to run multiple containers, run one container at with the port argum
 
 This means the 2nd container can be accessed at <http://127.0.0.1:2000>.
 
-
 If you already have an existing container, you can simply start it from the Docker Desktop application.
 
 ### Without Docker (for development)
 
-Activate the Python virtual environment and run the `app.py` script 
+Activate the Python virtual environment and run the `app.py` script
 
 ```bash
 venv\Scripts\activate # use source venv/bin/activate for linux and macOS
 ```
+
 ```bash
 python3 app.py
 ```
@@ -117,9 +120,9 @@ To conduct facial recognition, you need to load images of people you wish to be 
 
 1. From the `simpliFRy/data` folder (created automatically when starting the app), create a new directory with all the images of the people you wish to be detected.
 
-2. In the `simpliFRy/data` folder, create a JSON file (name it whatever you want) that maps the image file name with the name of the person to be recognised. 
+2. In the `simpliFRy/data` folder, create a JSON file (name it whatever you want) that maps the image file name with the name of the person to be recognised.
 
-For example, if `john_doe1.jpg` and `john_doe2.png` are pictures of 'John Doe' while `jane_smith.png` is a picture of 'Jane Smith', and all images are in a folder called `pictures`, this is the directory structure. 
+For example, if `john_doe1.jpg` and `john_doe2.png` are pictures of 'John Doe' while `jane_smith.png` is a picture of 'Jane Smith', and all images are in a folder called `pictures`, this is the directory structure.
 
 ```
 simpliFRy/
@@ -139,28 +142,28 @@ simpliFRy/
 
 ```json
 {
-  "img_folder_path": "pictures",
-  "flag_folder_path": "flags",
-  "details": [
-    {
-      "name": "John Doe",
-      "images": ["john_doe1.jpg", "john_doe2.png"],
-      "country_flag": "singapore_flag.png",
-      "description": "someone",
-      "table": "T1",
-      "tags": ["Army", "DIS"],
-      "priority": 2
-    },
-    {
-      "name": "3SG CALEB CHIA",
-      "images": ["caleb.png"],
-      "country_flag": "singapore_flag.png",
-      "description": "someone else",
-      "table": "VIP",
-      "tags": ["Air Force"],
-      "priority": 1
-    }
-  ]
+    "img_folder_path": "pictures",
+    "flag_folder_path": "flags",
+    "details": [
+        {
+            "name": "John Doe",
+            "images": ["john_doe1.jpg", "john_doe2.png"],
+            "country_flag": "singapore_flag.png",
+            "description": "someone",
+            "table": "T1",
+            "tags": ["Army", "DIS"],
+            "priority": 2
+        },
+        {
+            "name": "3SG CALEB CHIA",
+            "images": ["caleb.png"],
+            "country_flag": "singapore_flag.png",
+            "description": "someone else",
+            "table": "VIP",
+            "tags": ["Air Force"],
+            "priority": 1
+        }
+    ]
 }
 ```
 
@@ -192,12 +195,11 @@ APP_ENV = production
 ## Pages
 
 The pages in this application are:
+
 - `localhost:1333`
 - `localhost:1333/seats`
 - `localhost:1333/old_layout`
 - `localhost:1333/settings`
-
-
 
 ### Settings
 
