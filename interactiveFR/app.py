@@ -23,11 +23,12 @@ fr_instance = FRVidPlayer()
 # Config from environment (can be overridden by argparse)
 config = SimpleNamespace(
     ip=os.getenv("APP_IP", "0.0.0.0"),
-    port=int(os.getenv("APP_PORT", "1333")),
+    port=int(os.getenv("APP_PORT", "1334")),
     video=os.getenv("APP_VIDEO", "true").lower() == "true",
-    env=os.getenv("APP_ENV", "development").lower(),
+    env=os.getenv("APP_ENV", "development").lower(), # "production" or "development"
 )
 
+# Ensure fr_instance runs .cleanup() before process termination
 atexit.register(fr_instance.cleanup)
 
 
@@ -46,7 +47,7 @@ def start():
 
     # Give the stream thread a moment to start and check if it's still alive
     time.sleep(0.3)
-    if not fr_instance.streamThread.is_alive():
+    if not fr_instance.streamThread or not fr_instance.streamThread.is_alive():
         log_info("Stream thread died immediately after starting")
         fr_instance.end_stream()
         return jsonify(stream=False, message="Failed to start video stream. Check logs for details.")
@@ -72,16 +73,16 @@ def end():
     return jsonify(stream=True, message="Success!")
 
 
-@app.route("/checkAlive")
-def check_alive():
-    """API to check if FR stream is alive"""
+@app.route("/streamStatus")
+def stream_status():
+    """API to check stream state and last error"""
 
-    try:
-        is_alive = fr_instance.is_started and fr_instance.streamThread.is_alive()
-    except AttributeError:
-        is_alive = False
-
-    return Response("Yes" if is_alive else "No", status=200, mimetype='text/plain')
+    return jsonify(
+        stream_state=fr_instance.stream_state,
+        last_error=fr_instance.last_error,
+        embeddings_loaded=getattr(fr_instance, "embeddings_loaded", False),
+        embeddings_loading=getattr(fr_instance, "embeddings_loading", False),
+    )
 
 @app.route("/vidFeed")
 def video_feed():
@@ -124,7 +125,7 @@ def submit_settings():
     return redirect(url_for('settings'))
 
 
-@app.route("/api/reference_images")
+@app.route("/reference_images")
 def api_reference_images():
     images = _collect_reference_images()
     return _json([{"name": n, "images": imgs} for n, imgs in sorted(images.items())])
@@ -133,8 +134,9 @@ def api_reference_images():
 @app.route("/listCameras")
 def list_cameras():
     """API to list available camera devices"""
-
-    return jsonify(VideoSource.list_cameras())
+    response = jsonify(VideoSource.list_cameras())
+    response.headers["Cache-Control"] = "no-store"
+    return response
 # ───────────────────────────── Pages ──────────────────────────────────────
 
 @app.route("/")
@@ -206,6 +208,7 @@ if __name__ == "__main__":
     if args.prod:
         config.env = "production"
 
+    # Cleanup upon interruption
     signal.signal(signal.SIGINT, fr_instance.cleanup)
 
     if config.env == "production":

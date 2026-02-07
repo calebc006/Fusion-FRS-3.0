@@ -1,8 +1,7 @@
-import { updateBBoxes } from "./utils.js";
+import { updateBBoxes, waitForStream, fetchStreamStatus } from "./utils.js";
 
 // ───────────────────────────── State ─────────────────────────────────────
-let currData = [],
-    hasTarget = false;
+let hasTarget = false;
 
 const $ = (id) => document.getElementById(id);
 const detectionList = $("table-detection-list");
@@ -14,14 +13,52 @@ const referencesPanelBtn = $("references-panel-button");
 const captureToast = $("capture-toast");
 
 // ───────────────────────────── Init ──────────────────────────────────────
+
+const tryRestartStream = async () => {
+    const streamSrc = localStorage.getItem("streamSrc");
+    if (!streamSrc) {
+        return { ok: false, message: "Missing stream source." };
+    }
+
+    const formData = new FormData();
+    formData.set("stream_src", streamSrc);
+
+    const response = await fetch("/start", { method: "POST", body: formData });
+    const data = await response.json();
+    if (!data.stream) {
+        return {
+            ok: false,
+            message: data.message || "Failed to start stream.",
+        };
+    }
+
+    const status = await waitForStream();
+    if (status.stream_state === "running") {
+        return { ok: true };
+    }
+    return {
+        ok: false,
+        message: status.last_error
+            ? `Stream failed (${status.stream_state}): ${status.last_error}`
+            : `Stream failed (${status.stream_state}). Please try again.`,
+    };
+};
+
 window.addEventListener("DOMContentLoaded", async () => {
     try {
-        const res = await fetch("/checkAlive");
-        if ((await res.text()) !== "Yes") {
-            alert("Stream not started. Please start from Home.");
-            return (window.location.href = "/");
+        const status = await fetchStreamStatus();
+        if (status.stream_state !== "running") {
+            const restart = await tryRestartStream();
+            if (!restart.ok) {
+                alert(
+                    restart.message ||
+                        "Stream not started. Please start from Home.",
+                );
+                return (window.location.href = "/");
+            }
         }
 
+        // cache-buster to prevent getting stuck by browser caching
         $("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
 
         const srcLabel = $("stream-source");
@@ -178,7 +215,7 @@ modal
 
 async function loadReferences() {
     try {
-        refData = await (await fetch("/api/reference_images")).json();
+        refData = await (await fetch("/reference_images")).json();
         nameSelect.innerHTML = '<option value="">-- All --</option>';
 
         if (!refData.length) {

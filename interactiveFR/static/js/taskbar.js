@@ -4,6 +4,11 @@ const home_button = document.getElementById("home-button");
 const settings_button = document.getElementById("settings-button");
 const reset_button = document.getElementById("reset-button");
 
+const fetchStreamStatus = async () => {
+    const response = await fetch("/streamStatus");
+    return response.json();
+};
+
 taskbarPlaceholder.addEventListener("mouseenter", () => {
     taskbar.classList.add("show");
 });
@@ -24,7 +29,25 @@ reset_button?.addEventListener("click", async (event) => {
     event.preventDefault();
     try {
         await fetch("/end", { method: "POST" });
-    } finally {
-        window.location.href = "/";
-    }
+    } catch {}
+
+    try {
+        await waitForStreamStop();
+    } catch {}
+
+    localStorage.removeItem("namelistPath");
+    localStorage.removeItem("streamSrc");
+    window.location.href = "/";
 });
+
+const waitForStreamStop = async ({ attempts = 6, delayMs = 500 } = {}) => {
+    let lastStatus = null;
+    for (let i = 0; i < attempts; i += 1) {
+        lastStatus = await fetchStreamStatus();
+        if (lastStatus.stream_state !== "running") {
+            return lastStatus;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return lastStatus;
+};

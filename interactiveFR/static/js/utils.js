@@ -243,3 +243,44 @@ export const updateBBoxes = (videoContainer, detections, options = {}) => {
 export const delay = (time) => {
     return new Promise((resolve) => setTimeout(resolve, time));
 };
+
+export const fetchStreamStatus = async () => {
+    const response = await fetch("/streamStatus");
+    return response.json();
+};
+
+// Waits several times for stream to start, if not assume stream failed
+export const waitForStream = async ({ attempts = 10, delayMs = 250 } = {}) => {
+    for (let i = 0; i < attempts; i += 1) {
+        const status = await fetchStreamStatus();
+        if (status.stream_state === "running") {
+            return status;
+        }
+        if (status.stream_state === "failed") {
+            return status;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return { stream_state: "failed", last_error: null };
+};
+
+export const waitForEmbeddings = async ({
+    attempts = 40,
+    delayMs = 250,
+} = {}) => {
+    for (let i = 0; i < attempts; i += 1) {
+        const status = await fetchStreamStatus();
+        if (status.stream_state === "failed") {
+            return status;
+        }
+        if (status.embeddings_loaded) {
+            return status;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return {
+        stream_state: "failed",
+        last_error: null,
+        embeddings_loaded: false,
+    };
+};

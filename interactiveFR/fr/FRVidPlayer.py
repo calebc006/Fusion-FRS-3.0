@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import time
 import traceback
@@ -7,17 +8,17 @@ import json
 from datetime import datetime, timedelta
 from typing import Generator, TypedDict
 import subprocess
-
+import logging
 import numpy as np
+from PIL import Image
 from insightface.app import FaceAnalysis
 from voyager import Index, Space
-from PIL import Image
 
 from fr import VideoPlayer
 from utils import calc_iou, log_info
 
-FR_SETTINGS_FP = 'settings.json'
-
+logging.getLogger('insightface').setLevel(logging.ERROR)
+os.environ['ORT_LOGGING_LEVEL'] = '3'
 
 def is_cuda_available() -> bool:
     try:
@@ -82,9 +83,12 @@ class FRVidPlayer(VideoPlayer):
         # Settings
         self.fr_settings = self._load_settings()
         self.perf_logging = self.fr_settings.get("perf_logging", False)
+        self.embeddings_loaded = False
+        self.embeddings_loading = False
 
         # Inference
         self.inference_lock = threading.Lock()
+        self.inferenceThread = None
         self.fr_results = []
 
         log_info("FR Model initialised!")
@@ -95,6 +99,8 @@ class FRVidPlayer(VideoPlayer):
         warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.face_align")
 
     def _load_settings(self) -> FRSettings:
+        FR_SETTINGS_FP = 'settings.json'
+
         defaults: FRSettings = {
             "threshold": 0.45, "holding_time": 3, "use_brute_force": False,
             "perf_logging": False, "use_differentiator": True, "threshold_lenient_diff": 0.55,
@@ -118,6 +124,18 @@ class FRVidPlayer(VideoPlayer):
         return self.fr_settings
 
     # ─────────────────────────── Index Management ────────────────────────────
+    def load_embeddings(self) -> None:
+        self.embeddings_loading = True
+        self.embeddings_loaded = False
+        success = False
+        try:
+            self._reset_index()
+            self.recent_detections = []
+            self._load_captures()
+            success = True
+        finally:
+            self.embeddings_loading = False
+            self.embeddings_loaded = success
 
     def _reset_index(self) -> None:
         self.name_list = []
@@ -135,11 +153,6 @@ class FRVidPlayer(VideoPlayer):
         norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
         norms[norms == 0] = 1
         self.db_embeddings_normalized = self.embeddings_array / norms
-
-    def load_embeddings(self) -> None:
-        self._reset_index()
-        self.recent_detections = []
-        self._load_captures()
 
     def _load_captures(self) -> int:
         root = os.path.join("data", "captures")
@@ -418,13 +431,24 @@ class FRVidPlayer(VideoPlayer):
 
     def _loop_inference(self) -> None:
         last_id, frame_cnt = -1, 0
-        while self.streamThread.is_alive() and not self.end_event.is_set():
+
+        # Perf logging
+        perf_interval_s = 5.0
+        last_perf_log = time.monotonic()
+        infer_calls = 0
+        infer_time_s_sum = 0.0
+        skipped_same_frame = 0
+        skipped_for_performance = 0
+
+        while not self.end_event.is_set():
+            if not self.streamThread or not self.streamThread.is_alive():
+                break
             try:
-                self.vid_lock.acquire_read()
-                curr_id, frame = self.frame_id, self.frame_bytes
-                self.vid_lock.release_read()
+                with self.vid_lock.read_lock():
+                    curr_id, frame = self.frame_id, self.frame_bytes
 
                 if curr_id == last_id:
+                    skipped_same_frame += 1
                     time.sleep(0.001)
                     continue
                 last_id = curr_id
@@ -432,11 +456,36 @@ class FRVidPlayer(VideoPlayer):
 
                 skip = self.fr_settings.get("frame_skip", 1)
                 if skip > 1 and frame_cnt % skip != 0:
+                    skipped_for_performance += 1
                     continue
+                
+                # Log inference time
+                if self.perf_logging:
+                    t0 = time.monotonic()
+                    results = self.infer(frame)
+                    infer_time_s_sum += (time.monotonic() - t0)
+                    infer_calls += 1
+                else:
+                    results = self.infer(frame)
 
-                results = self.infer(frame)
                 with self.inference_lock:
                     self.fr_results = results
+
+                # Write perf log if it has been perf_interval_s since the last log
+                now = time.monotonic()
+                if self.perf_logging and (now - last_perf_log) >= perf_interval_s:
+                    interval = max(now - last_perf_log, 1e-9)
+                    fps_infer = infer_calls / interval
+                    avg_ms = (infer_time_s_sum / max(infer_calls, 1)) * 1000.0
+                    skip_val = self.fr_settings.get("frame_skip", 1)
+                    wait_ratio = skipped_same_frame / max(skipped_same_frame + infer_calls, 1)
+                    log_info(f"[PERF] infer:{fps_infer:.1f}fps/{avg_ms:.0f}ms skip:{skip_val} wait:{wait_ratio:.1%}")
+                    last_perf_log = now
+                    infer_calls = 0
+                    infer_time_s_sum = 0.0
+                    skipped_same_frame = 0
+                    skipped_for_performance = 0
+
             except Exception as e:
                 log_info(f"Inference loop error: {e}")
         self._reset_index()
@@ -457,3 +506,38 @@ class FRVidPlayer(VideoPlayer):
                 continue
             last_hash, last_send = h, now
             yield json.dumps({"data": results}) + '\n'
+
+    def cleanup(self, *_args) -> None:
+        """Sets event to trigger termination of inference and streaming processees"""
+
+        log_info("CLEANING UP...")
+
+        self.end_stream()
+
+        # Join thread briefly to allow clean exitW
+        try:
+            if self.streamThread and self.streamThread.is_alive():
+                self.streamThread.join(timeout=1)
+            if self.inferenceThread and self.inferenceThread.is_alive():
+                self.inferenceThread.join(timeout=1)
+        except Exception:
+            pass
+
+        self._reset_index()
+        self.recent_detections = []
+
+        force_exit = bool(_args)
+        if not force_exit:
+            return None
+
+        time.sleep(0.5)
+
+        # Final safety: exit if anything lingers
+        try:
+            sys.exit(0)
+        except SystemExit:
+            # In case sys.exit is swallowed by threads, force exit
+            import os
+            os._exit(0)
+
+        return None

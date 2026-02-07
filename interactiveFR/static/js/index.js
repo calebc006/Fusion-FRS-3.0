@@ -1,17 +1,22 @@
+import {
+    fetchStreamStatus,
+    waitForEmbeddings,
+    waitForStream,
+} from "./utils.js";
+
 const customRTSP = document.getElementById("stream_src_custom");
 const cameraSelect = document.getElementById("camera_device_select");
-const form = document.getElementById("init");
 let isEndingStream = false;
 
 window.addEventListener("DOMContentLoaded", async () => {
-    fetch("/checkAlive")
-        .then((response) => response.text())
-        .then((data) => {
-            if (data === "Yes") {
-                window.location.href = "/interactive";
-            }
-        })
-        .catch((error) => console.log(error));
+    try {
+        const status = await fetchStreamStatus();
+        if (status.stream_state === "running" && status.embeddings_loaded) {
+            window.location.href = "/interactive";
+        }
+    } catch (error) {
+        console.log(error);
+    }
 });
 
 const endStreamAndReload = async () => {
@@ -69,16 +74,15 @@ document.getElementById("init").onsubmit = async (event) => {
     // Store stream source
     localStorage.setItem("streamSrc", streamSrc);
 
-    // Remove submit button and create loading indicator
-    const submitButton = document.getElementById("submit-button");
-    submitButton.remove();
+    const removeSubmitButton = () => {
+        const submitButton = document.getElementById("submit-button");
+        submitButton?.remove();
+    };
 
-    const loader = document.createElement("h4");
-    loader.classList.add("loading-indicator");
-
-    form.appendChild(loader);
-
-    let addSubmitButton = () => {
+    const addSubmitButton = () => {
+        if (document.getElementById("submit-button")) {
+            return;
+        }
         const newSubmit = document.createElement("input");
         newSubmit.type = "submit";
         newSubmit.id = "submit-button";
@@ -87,60 +91,66 @@ document.getElementById("init").onsubmit = async (event) => {
         form.appendChild(newSubmit);
     };
 
-    // Load embeddings then start stream
-    fetch(`/start`, {
-        method: "POST",
-        body: formData,
-    })
-        .then((response) => response.json())
-        .then((data) => {
-            // Create loading animation with "Starting stream..."
-            let intervalId = createLoadingAnimation("Starting stream", loader);
+    removeSubmitButton();
+    const loading = createLoadingManager(form);
+    loading.start("Starting stream");
+    let startRequestPending = true;
+    loading.schedule(() => {
+        if (startRequestPending) {
+            loading.start("Loading embeddings");
+        }
+    }, 600);
 
-            if (data.stream) {
-                console.log("Stream started!");
-
-                // Brief delay then verify stream is still alive before redirecting
-                clearInterval(intervalId);
-                intervalId = createLoadingAnimation("Verifying stream", loader);
-
-                setTimeout(async () => {
-                    try {
-                        const aliveRes = await fetch("/checkAlive");
-                        const alive = await aliveRes.text();
-                        clearInterval(intervalId);
-                        loader.remove();
-
-                        if (alive === "Yes") {
-                            form.style.display = "none";
-                            window.location.href = "/interactive";
-                        } else {
-                            alert(
-                                "Stream failed shortly after starting. Please check your source and try again.",
-                            );
-                            addSubmitButton();
-                        }
-                    } catch {
-                        clearInterval(intervalId);
-                        loader.remove();
-                        addSubmitButton();
-                    }
-                }, 1500);
-            } else {
-                clearInterval(intervalId);
-                loader.remove();
-                alert(data.message);
-
-                // Re-add the submit button so user can retry
-                addSubmitButton();
-            }
-        })
-        .catch(() => {
-            alert(`Error loading stream from ${streamSrc}. Please try again.`);
-
-            // Re-add the submit button so user can retry
-            addSubmitButton();
+    try {
+        const response = await fetch("/start", {
+            method: "POST",
+            body: formData,
         });
+        const data = await response.json();
+        startRequestPending = false;
+        loading.stop();
+
+        if (!data.stream) {
+            loading.remove();
+            addSubmitButton();
+
+            alert(data.message || "Failed to start stream.");
+            return;
+        }
+
+        loading.start("Loading embeddings");
+        const embeddingsStatus = await waitForEmbeddings();
+
+        if (!embeddingsStatus.embeddings_loaded) {
+            loading.remove();
+            addSubmitButton();
+            alert("Embedding load timed out. Please try again.");
+            return;
+        }
+
+        loading.start("Verifying stream");
+        const status = await waitForStream();
+
+        loading.remove();
+
+        if (status.stream_state === "running") {
+            window.location.href = "/interactive";
+            return;
+        }
+
+        addSubmitButton();
+        alert(
+            status.last_error
+                ? `Stream failed (${status.stream_state}): ${status.last_error}`
+                : `Stream failed (${status.stream_state}). Please check your source and try again.`,
+        );
+    } catch {
+        startRequestPending = false;
+        loading.remove();
+        addSubmitButton();
+
+        alert(`Error loading stream from ${streamSrc}. Please try again.`);
+    }
 };
 
 // Handles loading animation (for dots)
@@ -152,6 +162,57 @@ const createLoadingAnimation = (text, loaderEl) => {
     };
 
     return setInterval(updateLoadingText, 500);
+};
+
+const createLoadingManager = (formEl) => {
+    let loader = formEl.querySelector(".loading-indicator");
+    if (!loader) {
+        loader = document.createElement("h4");
+        loader.classList.add("loading-indicator");
+        formEl.appendChild(loader);
+    }
+
+    let intervalId = null;
+    let timerId = null;
+
+    const stop = () => {
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        if (timerId) {
+            clearTimeout(timerId);
+            timerId = null;
+        }
+    };
+
+    const start = (text) => {
+        stop();
+        intervalId = createLoadingAnimation(text, loader);
+    };
+
+    const schedule = (fn, delayMs) => {
+        if (timerId) {
+            clearTimeout(timerId);
+        }
+        timerId = setTimeout(() => {
+            timerId = null;
+            fn();
+        }, delayMs);
+    };
+
+    const remove = () => {
+        stop();
+        loader?.remove();
+        loader = null;
+    };
+
+    return {
+        start,
+        stop,
+        schedule,
+        remove,
+    };
 };
 
 // Handles stream selection
@@ -182,8 +243,6 @@ const inputConfigBySelection = {
 };
 
 const fetchCameras = async () => {
-    cameraSelect.innerHTML =
-        '<option value="" disabled selected>Detecting cameras...</option>';
     try {
         const response = await fetch("/listCameras");
         const cameras = await response.json();
@@ -193,7 +252,7 @@ const fetchCameras = async () => {
         if (cameras.length === 0) {
             cameraSelect.innerHTML =
                 '<option value="" disabled selected>No cameras detected</option>';
-            return;
+            return false;
         }
 
         cameras.forEach((name) => {
@@ -202,11 +261,37 @@ const fetchCameras = async () => {
             option.textContent = name;
             cameraSelect.appendChild(option);
         });
+        return true;
     } catch (error) {
         console.log(error);
         cameraSelect.innerHTML =
             '<option value="" disabled selected>Error detecting cameras</option>';
+        return false;
     }
+};
+
+let cameraPollTimer = null;
+
+const stopCameraPolling = () => {
+    if (cameraPollTimer) {
+        clearTimeout(cameraPollTimer);
+        cameraPollTimer = null;
+    }
+};
+
+const startCameraPolling = async () => {
+    stopCameraPolling();
+
+    const poll = async () => {
+        if (streamSelectElem.value !== "camera") {
+            stopCameraPolling();
+            return;
+        }
+        await fetchCameras();
+        cameraPollTimer = setTimeout(poll, 500);
+    };
+
+    poll();
 };
 
 const updateStreamSourceUI = () => {
@@ -221,10 +306,14 @@ const updateStreamSourceUI = () => {
         showInput(config.input, { required: config.required });
 
         if (selection === "camera") {
-            fetchCameras();
+            startCameraPolling();
+        } else {
+            stopCameraPolling();
         }
         return;
     }
+
+    stopCameraPolling();
 
     streamSelectElem.setAttribute("name", "stream_src");
 };
