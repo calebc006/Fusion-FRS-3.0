@@ -18,7 +18,7 @@ taskbarPlaceholder.addEventListener("mouseleave", () => {
 });
 
 home_button?.addEventListener("click", async (event) => {
-    window.location.href = "/interactive";
+    window.location.href = "/";
 });
 
 settings_button?.addEventListener("click", async (event) => {

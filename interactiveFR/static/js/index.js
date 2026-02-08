@@ -218,12 +218,10 @@ const createLoadingManager = (formEl) => {
 // Handles stream selection
 const streamSelectElem = document.getElementById("stream_src_select");
 
-const hideInput = (inputEl, { clear = true, required = false } = {}) => {
+const hideInput = (inputEl, { clear = true } = {}) => {
     inputEl.style.display = "none";
     inputEl.removeAttribute("name");
-    if (required) {
-        inputEl.removeAttribute("required");
-    }
+    inputEl.removeAttribute("required");
     if (clear) {
         inputEl.value = "";
     }

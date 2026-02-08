@@ -178,7 +178,7 @@ class FRVidPlayer(VideoPlayer):
             if emb is None:
                 emb = self._avg_embedding(person_dir, images)
                 if emb.size:
-                    self._save_cached_embedding(person_dir, emb, len(images))
+                    self._save_cached_embedding(person_dir, emb)
 
             if emb is not None and emb.size:
                 self._add_embedding(display_name, emb)
@@ -209,10 +209,6 @@ class FRVidPlayer(VideoPlayer):
     def _embedding_cache_path(folder: str) -> str:
         return os.path.join(folder, "embedding_avg.npy")
 
-    @staticmethod
-    def _embedding_meta_path(folder: str) -> str:
-        return os.path.join(folder, "embedding_meta.json")
-
     def _load_cached_embedding(self, folder: str) -> np.ndarray | None:
         cache_path = self._embedding_cache_path(folder)
         if not os.path.exists(cache_path):
@@ -223,11 +219,16 @@ class FRVidPlayer(VideoPlayer):
             log_info(f"Embedding cache load failed: {cache_path} ({e})")
             return None
 
-    def _save_cached_embedding(self, folder: str, emb: np.ndarray, count: int) -> None:
+    @staticmethod
+    def _count_capture_images(folder: str) -> int:
+        try:
+            return len([i for i in os.listdir(folder) if i.lower().endswith((".jpg", ".jpeg", ".png"))])
+        except Exception:
+            return 0
+
+    def _save_cached_embedding(self, folder: str, emb: np.ndarray) -> None:
         try:
             np.save(self._embedding_cache_path(folder), emb)
-            with open(self._embedding_meta_path(folder), "w") as f:
-                json.dump({"count": int(count)}, f)
         except Exception as e:
             log_info(f"Embedding cache save failed: {folder} ({e})")
 
@@ -268,10 +269,10 @@ class FRVidPlayer(VideoPlayer):
         r = min(int(bbox[2] * self.width), self.width)
         b = min(int(bbox[3] * self.height), self.height)
 
-        # Expand bbox slightly (15%) while staying within frame
+        # Expand bbox (70%) while staying within frame
         bw, bh = max(r - l, 0), max(b - t, 0)
-        pad_x = int(bw * 0.15)
-        pad_y = int(bh * 0.15)
+        pad_x = int(bw * 0.7)
+        pad_y = int(bh * 0.7)
         l = max(l - pad_x, 0)
         t = max(t - pad_y, 0)
         r = min(r + pad_x, self.width)
@@ -281,22 +282,17 @@ class FRVidPlayer(VideoPlayer):
 
     def _update_cached_embedding(self, folder: str, emb: np.ndarray) -> None:
         cache_path = self._embedding_cache_path(folder)
-        meta_path = self._embedding_meta_path(folder)
         try:
-            count = 0
-            if os.path.exists(meta_path):
-                with open(meta_path) as f:
-                    count = int(json.load(f).get("count", 0))
+            image_count = self._count_capture_images(folder)
+            prev_count = max(image_count - 1, 0)
 
             if os.path.exists(cache_path):
                 prev = np.load(cache_path)
-                new_avg = (prev * count + emb) / max(count + 1, 1)
+                new_avg = (prev * prev_count + emb) / max(prev_count + 1, 1)
             else:
                 new_avg = emb
 
             np.save(cache_path, new_avg)
-            with open(meta_path, "w") as f:
-                json.dump({"count": count + 1}, f)
         except Exception as e:
             log_info(f"Embedding cache update failed: {folder} ({e})")
 
@@ -426,6 +422,8 @@ class FRVidPlayer(VideoPlayer):
     # ──────────────────────── Inference Thread ─────────────────────────────
 
     def start_inference(self) -> None:
+        with self.inference_lock:
+            self.fr_results = []
         self.inferenceThread = threading.Thread(target=self._loop_inference, daemon=True)
         self.inferenceThread.start()
 

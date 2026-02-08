@@ -1,4 +1,4 @@
-import { updateBBoxes, waitForStream, fetchStreamStatus } from "./utils.js";
+import { updateBBoxes, clearBBoxes, waitForStream, fetchStreamStatus } from "./utils.js";
 
 // ───────────────────────────── State ─────────────────────────────────────
 let hasTarget = false;
@@ -66,6 +66,7 @@ window.addEventListener("DOMContentLoaded", async () => {
             srcLabel.textContent = localStorage.getItem("streamSrc") || "";
         }
 
+        clearBBoxes($("video-container"));
         fetchDetections();
     } catch {
         alert("Unable to connect to server.");
@@ -74,47 +75,66 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ───────────────────────────── Main Loop ─────────────────────────────────
-async function fetchDetections() {
+const fetchDetections = () => {
     let buffer = "";
+    let data = [];
 
-    try {
-        const res = await fetch("/frResults");
-        if (!res.ok || !res.body) throw new Error();
+    fetch("/frResults")
+        .then((response) => {
+            if (!response.ok || !response.body) {
+                console.error("Fetch failed, retrying...");
+                setTimeout(() => fetchDetections(), 5000);
+                return;
+            }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            const processStream = () => {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        console.log("Stream ended, reconnecting...");
+                        setTimeout(() => fetchDetections(), 2000);
+                        return;
+                    }
 
-            buffer += decoder.decode(value, { stream: true });
-            const parts = buffer.split("\n");
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
 
-            try {
-                if (parts.length > 1) {
-                    const data = JSON.parse(parts.at(-2))?.data || [];
-                    currData = updateBBoxes($("video-container"), data, {
+                    const parts = buffer.split("\n");
+
+                    try {
+                        if (parts.length > 1) {
+                            data = JSON.parse(parts[parts.length - 2])?.data || [];
+                        }
+                    } catch (err) {
+                        console.error("Error parsing JSON:", err);
+                    }
+
+                    buffer = parts[parts.length - 1] || "";
+
+                    updateBBoxes($("video-container"), data, {
                         showLabels: true,
                         showUnknown: true,
                     });
                     updateDetectionList(data);
                     updateCapturePanel(data);
-                }
-            } catch {}
 
-            buffer = parts.at(-1) || "";
-        }
-    } catch (e) {
-        console.error("Fetch error:", e);
-    }
+                    processStream(); // recursive call
+                });
+            };
 
-    setTimeout(fetchDetections, 2000);
-}
+            processStream();
+        })
+        .catch((error) => {
+            console.error("Error fetching detections:", error);
+            setTimeout(() => fetchDetections(), 5000);
+        });
+};
 
 function updateDetectionList(data) {
     const seen = new Set();
-    const els = [];
+    const detections = [];
 
     data.forEach((d) => {
         const label = d.label?.toUpperCase();
@@ -125,13 +145,13 @@ function updateDetectionList(data) {
         el.className = "table-detection-element";
         el.dataset.name = label;
         el.innerHTML = `<span class="detection-name">${label}</span>`;
-        els.push(el);
+        detections.push(el);
     });
 
-    els.sort((a, b) =>
+    detections.sort((a, b) =>
         (a.dataset.name || "").localeCompare(b.dataset.name || ""),
     );
-    detectionList.replaceChildren(...els);
+    detectionList.replaceChildren(...detections);
 }
 
 function updateCapturePanel(data) {
@@ -180,6 +200,8 @@ captureBtn.addEventListener("click", async () => {
         if (result.ok) captureInput.value = "";
     } catch {
         showCaptureToast("Capture failed.", "error");
+    } finally {
+        captureBtn.disabled = !hasTarget || !captureInput.value.trim();
     }
 });
 
