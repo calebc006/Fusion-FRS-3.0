@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="../static/css/references.css" />
     <link rel="stylesheet" href="../static/css/taskbar.css" />
   </head>
-  <body>
+  <body class="references-page">
     <div class="references-container">
       <h1>Reference Images</h1>
       <p class="subtitle">Browse captured faces by person.</p>
@@ -27,10 +27,16 @@
       </div>
     </div>
 
+    <!-- Lightbox -->
+     <div id="lightbox" class="lightbox">
+       <span class="lightbox-close">&times;</span>
+       <img src="" alt="Full size" />
+     </div>
+
     <!-- Bottom Taskbar -->
     <div class="taskbar-placeholder">
       <div class="taskbar">
-        <button id="home-button">Home</button>
+        <button id="home-button">Back</button>
         <button id="settings-button">Settings</button>
       </div>
     </div>

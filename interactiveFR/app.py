@@ -15,7 +15,7 @@ from utils import log_info
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app)
+CORS(app) 
 
 log_info("Starting FR Session")
 fr_instance = FRVidPlayer()
@@ -39,7 +39,7 @@ def start():
     """API for frontend to start FR"""
 
     if fr_instance.is_started:
-        return jsonify(stream=False, message="Stream already started!")
+        return _json({"stream": False, "message": "Stream already started!"})
 
     stream_src = request.form.get("stream_src")
 
@@ -50,16 +50,16 @@ def start():
     if not fr_instance.streamThread or not fr_instance.streamThread.is_alive():
         log_info("Stream thread died immediately after starting")
         fr_instance.end_stream()
-        return jsonify(stream=False, message="Failed to start video stream. Check logs for details.")
+        return _json({"stream": False, "message": "Failed to start video stream. Check logs for details."})
 
     try:
         fr_instance.load_embeddings()
     except (ValueError, FileNotFoundError) as e:
         fr_instance.end_stream()
-        return jsonify(stream=False, message=str(e))
+        return _json({"stream": False, "message": str(e)})
 
     fr_instance.start_inference()
-    return jsonify(stream=True, message="Success!")
+    return _json({"stream": True, "message": "Success!"})
 
 
 @app.route("/end", methods=["POST"])
@@ -67,31 +67,31 @@ def end():
     """API for frontend to end FR"""
 
     if not fr_instance.is_started:
-        return jsonify(stream=False, message="Stream not started!")
+        return _json({"stream": False, "message": "Stream not started!"})
 
     fr_instance.end_stream()
-    return jsonify(stream=True, message="Success!")
+    return _json({"stream": True, "message": "Success!"})
 
 
-@app.route("/streamStatus")
+@app.route("/streamStatus", methods=["GET"])
 def stream_status():
     """API to check stream state and last error"""
 
-    return jsonify(
-        stream_state=fr_instance.stream_state,
-        last_error=fr_instance.last_error,
-        embeddings_loaded=getattr(fr_instance, "embeddings_loaded", False),
-        embeddings_loading=getattr(fr_instance, "embeddings_loading", False),
-    )
+    return _json({
+        "stream_state": fr_instance.stream_state,
+        "last_error": fr_instance.last_error,
+        "embeddings_loaded": getattr(fr_instance, "embeddings_loaded", False),
+        "embeddings_loading": getattr(fr_instance, "embeddings_loading", False),
+    })
 
-@app.route("/vidFeed")
+@app.route("/vidFeed", methods=["GET"])
 def video_feed():
     if not config.video:
         return Response("Video disabled", status=405)
     return Response(fr_instance.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.route("/frResults")
+@app.route("/frResults", methods=["GET"])
 def fr_results():
     return Response(fr_instance.start_detection_broadcast(), mimetype="application/json")
 
@@ -119,17 +119,35 @@ def submit_settings():
         "threshold_prev": float(request.form.get("threshold_prev", s["threshold_prev"])),
         "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
         "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
-        "frame_skip": int(request.form.get("frame_skip", s.get("frame_skip", 1))),
+        "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
+        "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
     }
     fr_instance.adjust_values(new)
     return redirect(url_for('settings'))
 
 
-@app.route("/reference_images")
+@app.route("/reference_images", methods=["GET"])
 def api_reference_images():
     images = _collect_reference_images()
     return _json([{"name": n, "images": imgs} for n, imgs in sorted(images.items())])
 
+
+@app.route("/remove_image", methods=["POST"])
+def remove_image():
+    payload = request.get_json(silent=True) or {}
+    image_path = payload.get("image_path")
+
+    if not image_path:
+        return _json({"message": "Missing image_path"}, 400)
+
+    drive, _ = os.path.splitdrive(image_path)
+    if drive:
+        return _json({"message": "Invalid image_path"}, 400)
+
+    result = fr_instance.remove_capture_image(image_path)
+    if result.get("ok"):
+        return _json({"message": result.get("message", "Success!")})
+    return _json({"message": result.get("message", "Invalid image_path")}, 400)
 
 @app.route("/listCameras")
 def list_cameras():
@@ -156,7 +174,7 @@ def references():
 
 @app.route("/settings")
 def settings():
-    return render_template("settings.html", **fr_instance.fr_settings)
+    return render_template("settings.html", **fr_instance.fr_settings) # Render with fr_settings as context
 
 
 @app.route('/data/<path:filename>')
@@ -166,8 +184,12 @@ def serve_data(filename):
 
 # ───────────────────────────── Helpers ────────────────────────────────────
 
-def _json(data, status=200):
-    return Response(json.dumps(data), status=status, mimetype='application/json')
+def _json(data, status=200, headers=None):
+    response = Response(json.dumps(data), status=status, mimetype='application/json')
+    if headers:
+        for key, value in headers.items():
+            response.headers[key] = value
+    return response
 
 
 def _collect_reference_images() -> dict:

@@ -27,7 +27,6 @@
           required
         />
         <div class="break"></div>
-        <!-- Value below which a face would be considered recognised; the lower the stricter -->
 
         <label for="holding_time">Holding Time</label>
         <input
@@ -41,7 +40,6 @@
           required
         />
         <div class="break"></div>
-        <!-- Time (in seconds) for which a name would be displayed after last recognition  -->
 
         <label for="use_brute_force">Use Brute Force Search</label>
         <input
@@ -55,7 +53,6 @@
           endif
           %}
         />
-        <!-- Toggle between brute force (exact, slower) and Voyager (fast ANN) search -->
 
         <div class="break"></div>
 
@@ -71,7 +68,6 @@
           endif
           %}
         />
-        <!-- Logs stream/inference/search timing periodically to data/logs -->
 
         <div class="break"></div>
 
@@ -86,7 +82,20 @@
           step="1"
           required
         />
-        <!-- Process every Nth frame (1=no skip, 2=every other frame, 3=every third frame). Higher values reduce CPU/GPU load -->
+
+        <div class="break"></div>
+
+        <label for="max_broadcast_fps">Max Broadcast FPS</label>
+        <input
+          type="number"
+          id="max_broadcast_fps"
+          name="max_broadcast_fps"
+          value="{{ max_broadcast_fps }}"
+          min="5"
+          max="200"
+          step="5"
+          required
+        />
       </fieldset>
 
       <fieldset class="form-section">
@@ -201,7 +210,7 @@
     <!-- Bottom Taskbar -->
     <div class="taskbar-placeholder">
       <div class="taskbar">
-        <button id="home-button">Home</button>
+        <button id="home-button">Back</button>
       </div>
     </div>
 

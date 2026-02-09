@@ -1,16 +1,18 @@
 import { updateBBoxes, clearBBoxes, waitForStream, fetchStreamStatus } from "./utils.js";
+import { initReferencesUI, refreshReferenceImages } from "./references.js";
 
 // ───────────────────────────── State ─────────────────────────────────────
 let hasTarget = false;
 
 const $ = (id) => document.getElementById(id);
-const detectionList = $("table-detection-list");
 const captureTarget = $("capture-target");
 const captureHeader = document.querySelector(".capture-header");
 const captureInput = $("capture-name");
 const captureBtn = $("capture-button");
 const referencesPanelBtn = $("references-panel-button");
 const captureToast = $("capture-toast");
+const videoFeed = $("video-feed");
+let isVideoReady = false;
 
 // ───────────────────────────── Init ──────────────────────────────────────
 
@@ -59,7 +61,12 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         // cache-buster to prevent getting stuck by browser caching
-        $("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
+        videoFeed?.setAttribute("data", `/vidFeed?t=${Date.now()}`);
+
+        videoFeed?.addEventListener("load", () => {
+            isVideoReady = true;
+            clearBBoxes($("video-container"));
+        });
 
         const srcLabel = $("stream-source");
         if (srcLabel) {
@@ -68,6 +75,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
         clearBBoxes($("video-container"));
         fetchDetections();
+        initReferencesUI({ autoLoad: true });
     } catch {
         alert("Unable to connect to server.");
         window.location.href = "/";
@@ -113,11 +121,14 @@ const fetchDetections = () => {
 
                     buffer = parts[parts.length - 1] || "";
 
-                    updateBBoxes($("video-container"), data, {
-                        showLabels: true,
-                        showUnknown: true,
-                    });
-                    updateDetectionList(data);
+                    if (isVideoReady) {
+                        updateBBoxes($("video-container"), data, {
+                            showLabels: true,
+                            showUnknown: true,
+                        });
+                    } else {
+                        clearBBoxes($("video-container"));
+                    }
                     updateCapturePanel(data);
 
                     processStream(); // recursive call
@@ -131,28 +142,6 @@ const fetchDetections = () => {
             setTimeout(() => fetchDetections(), 5000);
         });
 };
-
-function updateDetectionList(data) {
-    const seen = new Set();
-    const detections = [];
-
-    data.forEach((d) => {
-        const label = d.label?.toUpperCase();
-        if (!label || label === "UNKNOWN" || seen.has(label)) return;
-        seen.add(label);
-
-        const el = document.createElement("div");
-        el.className = "table-detection-element";
-        el.dataset.name = label;
-        el.innerHTML = `<span class="detection-name">${label}</span>`;
-        detections.push(el);
-    });
-
-    detections.sort((a, b) =>
-        (a.dataset.name || "").localeCompare(b.dataset.name || ""),
-    );
-    detectionList.replaceChildren(...detections);
-}
 
 function updateCapturePanel(data) {
     hasTarget = data.some((d) => d.is_target);
@@ -208,19 +197,11 @@ captureBtn.addEventListener("click", async () => {
 // ───────────────────────────── References Modal ──────────────────────────
 const modal = $("references-modal");
 const openReferencesPage = $("open-references-page");
-const nameSelect = $("name-select");
-const gallery = $("image-gallery");
-const imgCount = $("image-count");
-const noImgs = $("no-images");
-const lightbox = $("lightbox");
-const lightboxImg = lightbox?.querySelector("img");
-
-let refData = [];
 
 referencesPanelBtn?.addEventListener("click", (e) => {
     e.preventDefault();
-    modal.classList.remove("hidden");
-    loadReferences();
+    modal?.classList.remove("hidden");
+    refreshReferenceImages({ preserveSelection: true });
 });
 
 openReferencesPage?.addEventListener("click", (e) => {
@@ -229,78 +210,14 @@ openReferencesPage?.addEventListener("click", (e) => {
 });
 
 $("close-references-modal")?.addEventListener("click", () =>
-    modal.classList.add("hidden"),
+    modal?.classList.add("hidden"),
 );
 modal
     ?.querySelector(".modal-overlay")
-    ?.addEventListener("click", () => modal.classList.add("hidden"));
+    ?.addEventListener("click", () => modal?.classList.add("hidden"));
 
-async function loadReferences() {
-    try {
-        refData = await (await fetch("/reference_images")).json();
-        nameSelect.innerHTML = '<option value="">-- All --</option>';
-
-        if (!refData.length) {
-            noImgs.style.display = "block";
-            gallery.innerHTML = "";
-            imgCount.textContent = "";
-            return;
-        }
-
-        noImgs.style.display = "none";
-        refData.forEach((p) => {
-            const opt = document.createElement("option");
-            opt.value = p.name;
-            opt.textContent = `${p.name} (${p.images.length})`;
-            nameSelect.appendChild(opt);
-        });
-        showImages();
-    } catch (e) {
-        console.error(e);
-        noImgs.textContent = "Error loading images.";
-        noImgs.style.display = "block";
-    }
-}
-
-function showImages(name = null) {
-    gallery.innerHTML = "";
-    const people = name ? refData.filter((p) => p.name === name) : refData;
-    let total = 0;
-
-    people.forEach((p) =>
-        p.images.forEach((src) => {
-            const card = document.createElement("div");
-            card.className = "image-card";
-            card.innerHTML = `<img src="${src}" alt="${p.name}" loading="lazy"><div class="image-name">${src.split("/").pop()}</div>`;
-            card.addEventListener("click", () => {
-                lightboxImg.src = src;
-                lightbox.classList.add("active");
-            });
-            gallery.appendChild(card);
-            total++;
-        }),
-    );
-
-    imgCount.textContent = name
-        ? `${total} images for "${name}"`
-        : `${total} images from ${refData.length} people`;
-}
-
-nameSelect?.addEventListener("change", (e) =>
-    showImages(e.target.value || null),
-);
-
-// Lightbox close
-lightbox
-    ?.querySelector(".lightbox-close")
-    ?.addEventListener("click", () => lightbox.classList.remove("active"));
-lightbox?.addEventListener(
-    "click",
-    (e) => e.target === lightbox && lightbox.classList.remove("active"),
-);
 document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-        lightbox.classList.remove("active");
-        modal.classList.add("hidden");
+        modal?.classList.add("hidden");
     }
 });

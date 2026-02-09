@@ -67,6 +67,18 @@ body {
     }
 }
 
+button {
+    padding: 1em 1.5em;
+    color: var(--color-foreground);
+    background-color: rgba(167, 50, 50, 0.8);
+    border-width: 0px;
+    border-radius: 1em;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        pointer-events 0.2s ease;
+}
+
 .bbox {
     position: absolute;
     background-color: transparent;
