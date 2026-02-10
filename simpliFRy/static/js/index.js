@@ -4,10 +4,10 @@ const infoMenu = document.getElementById("info-menu");
 let namelistPath = null;
 
 window.addEventListener("DOMContentLoaded", async () => {
-    fetch("/checkAlive")
-        .then((response) => response.text())
+    fetch("/streamStatus")
+        .then((response) => response.json())
         .then((data) => {
-            if (data === "Yes") {
+            if (data.stream_state === "running") {
                 // Hide form and show post-init menu 
                 form.style.display = "none";
                 infoMenu.style.display = "flex";
@@ -33,8 +33,15 @@ document.getElementById("init").onsubmit = async (event) => {
     const form = event.target;
     const formData = new FormData(form);
 
-    // Set namelist path 
-    namelistPath = `./data/${formData.get("data_file")}`;
+    // Validate data file is provided
+    const dataFile = formData.get("data_file");
+    if (!dataFile || !dataFile.trim()) {
+        alert("Please select a JSON namelist file.");
+        return;
+    }
+
+    // Store namelist path as-is
+    namelistPath = dataFile;
     localStorage.setItem("namelistPath", namelistPath);
 
     // Store stream source
@@ -167,18 +174,25 @@ dropZone.addEventListener("drop", (e) => {
     }
 });
 
-// Handle file selection
+// Handle file selection - stores full relative path
 const handleFileSelection = (fileName) => {
-    selectedFileName = fileName;
-    dataFileInput.value = fileName;
+    const fullPath = `data/${fileName}`;
+    selectedFileName = fullPath;
+    dataFileInput.value = fullPath;
     fileNameDisplay.textContent = `Selected: ${fileName}`;
 };
 
-// Optional: Form validation reminder
+// Form validation
 form.addEventListener("submit", function (e) {
     if (streamSelectElem.value === "custom" && !customInput.value.trim()) {
         e.preventDefault();
         alert("Please enter a valid custom RTSP URL.");
+        return;
+    }
+    if (!dataFileInput.value.trim()) {
+        e.preventDefault();
+        alert("Please select a JSON namelist file.");
+        return;
     }
 });
 

@@ -110,6 +110,7 @@ class FRVidPlayer(VideoPlayer):
         self.inference_lock = threading.Lock()
         self.inferenceThread = None
         self.fr_results = []
+        self.broadcast_package = []
 
         log_info("FR Model initialised!")
 
@@ -431,7 +432,7 @@ class FRVidPlayer(VideoPlayer):
             faces = self.model.get(img)
             if not faces:
                 self._update_recent([])
-                return [{"label": l["name"]} for l in self.old_detections]
+                return [{"label": l["name"], "held": True} for l in self.old_detections]
 
             embeddings = [f.normed_embedding for f in faces]
             bboxes = [self._frac_bbox(img.shape[1], img.shape[0], f.bbox.tolist()) for f in faces]
@@ -459,9 +460,15 @@ class FRVidPlayer(VideoPlayer):
             ])
 
             return [
-                {"bbox": bboxes[i], "label": labels[i], "score": float(dists[i][0]), "is_target": i == target_idx}
+                {
+                    "bbox": bboxes[i],
+                    "label": labels[i],
+                    "score": float(dists[i][0]),
+                    "is_target": i == target_idx,
+                    "held": False,
+                }
                 for i in range(len(faces))
-            ] + [{"label": l["name"]} for l in self.old_detections]
+            ] + [{"label": l["name"], "held": True} for l in self.old_detections]
 
         except Exception as e:
             log_info(f"Infer error: {e}\n{traceback.format_exc()}")
@@ -501,8 +508,6 @@ class FRVidPlayer(VideoPlayer):
         Updates self.current_detections based on the latest detections
         Preserves previous detections in self.old_detections for holding_time
         '''
-        self.current_detections = updated
-
         preserved = []
         updated_names = {d["name"] for d in updated}
         cutoff = datetime.now() - timedelta(seconds=self.fr_settings["holding_time"])
@@ -510,7 +515,19 @@ class FRVidPlayer(VideoPlayer):
             if d["name"] not in updated_names and d["last_seen"] > cutoff:
                 preserved.append(d)
 
+        self.current_detections = updated
         self.old_detections = preserved
+
+    def _merge_with_held(self, results: list[FRResult]) -> list[FRResult]:
+        """Append held detections that are still within holding_time."""
+        merged = list(results)
+        result_labels = {r["label"] for r in merged}
+        cutoff = datetime.now() - timedelta(seconds=self.fr_settings["holding_time"])
+        for d in self.old_detections:
+            if d["name"] not in result_labels and d["last_seen"] > cutoff:
+                merged.append({"label": d["name"], "held": True})
+                result_labels.add(d["name"])
+        return merged
 
     def _brute_search(self, queries: list[np.ndarray], k: int) -> tuple[list, list]:
         if not self.db_embeddings_normalized.size:
@@ -540,6 +557,7 @@ class FRVidPlayer(VideoPlayer):
     def start_inference(self) -> None:
         with self.inference_lock:
             self.fr_results = []
+            self.broadcast_package = []
         self.inferenceThread = threading.Thread(target=self._loop_inference, daemon=True)
         self.inferenceThread.start()
 
@@ -590,6 +608,7 @@ class FRVidPlayer(VideoPlayer):
                 # Write inference results
                 with self.inference_lock:
                     self.fr_results = results
+                    self.broadcast_package = self._merge_with_held(results)
 
                 # Write perf log if it has been perf_interval_s since the last log
                 now = time.monotonic()
@@ -614,7 +633,7 @@ class FRVidPlayer(VideoPlayer):
         self.old_detections = []
 
     def start_detection_broadcast(self) -> Generator[str, None, None]:
-        last_hash, last_send_time = None, 0
+        last_send_time = 0
         while self.inferenceThread and self.inferenceThread.is_alive():
             # Cap rate of broadcast to MAX_BROADCAST_FPS
             now = time.monotonic()
@@ -623,15 +642,9 @@ class FRVidPlayer(VideoPlayer):
                 continue
 
             with self.inference_lock:
-                results = self.fr_results
+                results = self.broadcast_package
             
-            # If results are the same, don't broadcast
-            h = hash(str(results))
-            if h == last_hash:
-                time.sleep(0.001)
-                continue
-
-            last_hash, last_send_time = h, now
+            last_send_time = now
             yield json.dumps({"data": results}) + '\n'
 
     def cleanup(self, *_args) -> None:
