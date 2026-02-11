@@ -24,7 +24,6 @@ FR_SETTINGS_PATH = 'settings.json'
 FR_DEFAULT_SETTINGS = {
     "threshold": 0.45, 
     "holding_time": 2, 
-    "use_brute_force": False,
     "perf_logging": False, 
     "frame_skip": 1, 
     "max_broadcast_fps": 50,
@@ -64,7 +63,6 @@ class RecentDetection(TypedDict):
 class FRSettings(TypedDict):
     threshold: float
     holding_time: int
-    use_brute_force: bool
     perf_logging: bool
     use_differentiator: bool
     threshold_lenient_diff: float
@@ -82,7 +80,8 @@ class FRVidPlayer(VideoPlayer):
 
     def __init__(self) -> None:
         super().__init__()
-        self._suppress_warnings()
+        warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.transform")
+        warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.face_align")
 
         provider = "CUDAExecutionProvider" if is_cuda_available() else "CPUExecutionProvider"
         self.model = FaceAnalysis(
@@ -92,14 +91,16 @@ class FRVidPlayer(VideoPlayer):
         )
         self.model.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
 
-        self._reset_index()
+        self.name_list = []
+        self.embeddings_list = []
+        self.vector_index = Index(Space.Cosine, num_dimensions=512)
         self.current_detections: list[RecentDetection] = []
         self.old_detections: list[RecentDetection] = []
 
         # Capture state
         self.capture_lock = threading.Lock()
         self.latest_frame_bytes: bytes | None = None
-        self.latest_target: dict | None = None
+        self.latest_target_detection: dict | None = None
 
         # Settings
         self.fr_settings = self._load_settings()
@@ -114,13 +115,20 @@ class FRVidPlayer(VideoPlayer):
 
         log_info("FR Model initialised!")
 
-    @staticmethod
-    def _suppress_warnings():
-        warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.transform")
-        warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.face_align")
+    def adjust_values(self, new_settings: FRSettings) -> FRSettings:
+        '''Adjust settings to new_settings'''
 
+        previous_settings = self.fr_settings or self._load_settings()
+        self.fr_settings = {**previous_settings, **new_settings} # Merge new_settings with previous
+        with open(FR_SETTINGS_PATH, 'w') as f:
+            json.dump(self.fr_settings, f)
+        return self.fr_settings
+    
     def _load_settings(self) -> FRSettings:
-        ''''Loads settings from FR_SETTINGS_PATH json file, uses defaults and writes back if not specified'''
+        ''''
+        Returns settings from FR_SETTINGS_PATH json file
+        If not specified, uses default values and writes back
+        '''
         
         defaults: FRSettings = FR_DEFAULT_SETTINGS
         if os.path.exists(FR_SETTINGS_PATH):
@@ -134,84 +142,42 @@ class FRVidPlayer(VideoPlayer):
             json.dump(defaults, f)
         return defaults
 
-    def adjust_values(self, new_settings: FRSettings) -> FRSettings:
-        previous_settings = self.fr_settings or self._load_settings()
-        self.fr_settings = {**previous_settings, **new_settings} # Merge new_settings with previous
-        with open(FR_SETTINGS_PATH, 'w') as f:
-            json.dump(self.fr_settings, f)
-        return self.fr_settings
 
     # ─────────────────────────── Index Management ────────────────────────────
     def load_embeddings(self) -> None:
-        # Full reload from disk (captures + cache)
+        '''Resets index, reloads from cache (recomputes cache if not found)'''
         self.embeddings_loading = True
         self.embeddings_loaded = False
-        success = False
+
         try:
             self._reset_index()
             self.current_detections = []
             self.old_detections = []
             self._load_captures()
-            success = True
-        finally:
+
             self.embeddings_loading = False
-            self.embeddings_loaded = success
+            self.embeddings_loaded = True
+        except:
+            self.embeddings_loading = False
+            self.embeddings_loaded = False
+
+            log_info("Failed to load embeddings!")
 
     def _reset_index(self) -> None:
         self.name_list = []
+        self.embeddings_list = []
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
-        self.embeddings_array = np.array([])
-        self.db_embeddings_normalized = np.array([])
-
-    def _add_embedding(self, name: str, embedding: np.ndarray) -> None:
-        self.name_list.append(name)
-        self.vector_index.add_item(embedding)
-        self.embeddings_array = (
-            np.array([embedding]) if self.embeddings_array.size == 0
-            else np.vstack([self.embeddings_array, embedding])
-        )
-        norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
-        norms[norms == 0] = 1
-        self.db_embeddings_normalized = self.embeddings_array / norms
 
     def _rebuild_index_from_embeddings(self) -> None:
         # Rebuild ANN index from in-memory embeddings
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
-        if self.embeddings_array.size == 0:
-            self.db_embeddings_normalized = np.array([])
-            return
 
-        for emb in self.embeddings_array:
+        for emb in self.embeddings_list:
             self.vector_index.add_item(emb)
 
-        norms = np.linalg.norm(self.embeddings_array, axis=1, keepdims=True)
-        norms[norms == 0] = 1
-        self.db_embeddings_normalized = self.embeddings_array / norms
-
-    def _upsert_embedding(self, name: str, embedding: np.ndarray | None) -> None:
-        # Insert/update/remove a single identity in-memory, then rebuild index
-        if name in self.name_list:
-            idx = self.name_list.index(name)
-            if embedding is None or not embedding.size:
-                self.name_list.pop(idx)
-                if self.embeddings_array.size:
-                    self.embeddings_array = np.delete(self.embeddings_array, idx, axis=0)
-                    if self.embeddings_array.size == 0:
-                        self.embeddings_array = np.array([])
-            else:
-                self.embeddings_array[idx] = embedding
-        else:
-            if embedding is None or not embedding.size:
-                return
-            self.name_list.append(name)
-            self.embeddings_array = (
-                np.array([embedding]) if self.embeddings_array.size == 0
-                else np.vstack([self.embeddings_array, embedding])
-            )
-
-        self._rebuild_index_from_embeddings()
-
     def _load_captures(self) -> int:
+        '''Reloads all images from cache, updates index (recomputes cache if not found)'''
+
         root = os.path.join("data", "captures")
         if not os.path.isdir(root):
             return 0
@@ -224,28 +190,32 @@ class FRVidPlayer(VideoPlayer):
             if not os.path.isdir(person_dir):
                 continue
 
-            display_name = str(name).strip().upper()
             images = self._list_capture_images(person_dir)
             scanned += len(images)
 
             if not images:
+                _ = self._recompute_cached_embedding(person_dir) # run this to delete the folder
                 continue
 
             # Prefer cached average; recompute if missing
             emb = self._load_cached_embedding(person_dir)
             if emb is None:
-                emb = self._recompute_cached_embedding(person_dir, images)
+                emb = self._recompute_cached_embedding(person_dir)
 
             if emb is not None and emb.size:
-                self._add_embedding(display_name, emb)
+                self.name_list.append(name)
+                self.embeddings_list.append(emb)
+                self.vector_index.add_item(emb)
                 added += 1
 
         log_info(f"Loaded {added} capture embeddings from {scanned} images.")
         return added
 
-    def _avg_embedding(self, folder: str, images: list[str]) -> np.ndarray:
+    def _get_avg_embedding(self, folder: str) -> np.ndarray:
         embeddings = []
+        images = self._list_capture_images(folder)
         no_face = 0
+
         for img_name in images:
             try:
                 img_path = os.path.join(folder, img_name)
@@ -259,11 +229,8 @@ class FRVidPlayer(VideoPlayer):
                 log_info(f"Capture image load failed: {img_name} ({e})")
         if no_face and not embeddings:
             log_info(f"No face detected in {no_face} capture image(s) from {folder}.")
+            
         return np.mean(embeddings, axis=0) if embeddings else np.array([])
-
-    @staticmethod
-    def _embedding_cache_path(folder: str) -> str:
-        return os.path.join(folder, "embedding_avg.npy")
 
     def _load_cached_embedding(self, folder: str) -> np.ndarray | None:
         cache_path = self._embedding_cache_path(folder)
@@ -274,6 +241,34 @@ class FRVidPlayer(VideoPlayer):
         except Exception as e:
             log_info(f"Embedding cache load failed: {cache_path} ({e})")
             return None
+
+    def _recompute_cached_embedding(self, folder: str) -> np.ndarray | None:
+        '''
+        Recalculates average embedding from images in folder and updates cache. 
+        '''
+
+        # Remove cache file and folder if no images
+        images = self._list_capture_images(folder)
+        if not images:
+            cache_path = self._embedding_cache_path(folder)
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+            os.rmdir(folder)
+            return None
+
+        emb = self._get_avg_embedding(folder)
+        if emb.size:
+            try:
+                np.save(self._embedding_cache_path(folder), emb)
+            except Exception as e:
+                log_info(f"Embedding cache save failed: {folder} ({e})")
+            return emb
+
+        return None
+
+    @staticmethod
+    def _embedding_cache_path(folder: str) -> str:
+        return os.path.join(folder, "embedding_avg.npy")
 
     @staticmethod
     def _count_capture_images(folder: str) -> int:
@@ -288,38 +283,53 @@ class FRVidPlayer(VideoPlayer):
             i for i in os.listdir(folder)
             if i.lower().endswith((".jpg", ".jpeg", ".png"))
         ]
+    
+    # ───────────────────────────── Capture ─────────────────────────────────
+    def capture_unknown(self, name: str) -> dict:
+        '''Captures the latest target'''
+        name = (name or "").strip().upper()
+        if not name:
+            return {"ok": False, "message": "Name is required."}
 
-    def _save_cached_embedding(self, folder: str, emb: np.ndarray) -> None:
+        with self.capture_lock:
+            detection, frame = self.latest_target_detection, self.latest_frame_bytes
+
+        if not detection or not frame:
+            return {"ok": False, "message": "No target face available."}
+
+        emb = np.asarray(detection["embedding"], dtype=np.float32)
+        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ").strip().replace(" ", "_")
+        data_dir = os.path.join("data", "captures", safe_name)
+        os.makedirs(data_dir, exist_ok=True)
+
         try:
-            np.save(self._embedding_cache_path(folder), emb)
+            self._save_capture_files(safe_name, data_dir, frame, detection["bbox"])
+            self._recompute_cached_embedding(data_dir)
+            updated_emb = self._load_cached_embedding(data_dir)
+            
+            if safe_name in self.name_list:
+                idx = self.name_list.index(safe_name)
+                self.embeddings_list[idx] = updated_emb
+            else:
+                self.name_list.append(safe_name)
+                self.embeddings_list.append(updated_emb)
+
+            self._rebuild_index_from_embeddings()
+            log_info(f"Captured face for {name}")
+            return {"ok": True, "message": f"Captured {name} successfully."}
+
         except Exception as e:
-            log_info(f"Embedding cache save failed: {folder} ({e})")
-
-    def _recompute_cached_embedding(self, folder: str, images: list[str] | None = None) -> np.ndarray | None:
-        # Recalculate average embedding from images and update cache
-        images = images if images is not None else self._list_capture_images(folder)
-        cache_path = self._embedding_cache_path(folder)
-
-        if not images:
-            if os.path.exists(cache_path):
-                os.remove(cache_path)
-            return None
-
-        emb = self._avg_embedding(folder, images)
-        if emb.size:
-            self._save_cached_embedding(folder, emb)
-            return emb
-
-        if os.path.exists(cache_path):
-            os.remove(cache_path)
-        return None
-
+            log_info(f"Capture failed for {name}: {e}")
+            return {"ok": False, "message": "Failed to save capture."}
+    
     def remove_capture_image(self, image_path: str) -> dict:
         '''Delete image then refresh cached + in-memory embedding'''
 
         relative_path = image_path.lstrip("/\\")
         captures_root = os.path.realpath(os.path.join(os.getcwd(), "data", "captures"))
         target_path = os.path.realpath(os.path.join(captures_root, relative_path))
+        person_dir = os.path.dirname(target_path)
+        display_name = os.path.basename(person_dir).strip().upper()
 
         if not (target_path == captures_root or target_path.startswith(captures_root + os.sep)):
             return {"ok": False, "message": "Invalid image_path"}
@@ -329,43 +339,20 @@ class FRVidPlayer(VideoPlayer):
 
         os.remove(target_path)
 
-        person_dir = os.path.dirname(target_path)
-        display_name = os.path.basename(person_dir).strip().upper()
-        remaining_images = self._list_capture_images(person_dir)
-        emb = self._recompute_cached_embedding(person_dir, remaining_images)
-        self._upsert_embedding(display_name, emb)
+        emb = self._recompute_cached_embedding(person_dir)
+
+        idx = self.name_list.index(display_name)
+        if emb is None or not emb.size:
+            self.name_list.pop(idx)
+            self.embeddings_list.pop(idx)
+        else:
+            self.embeddings_list[idx] = emb
+
+        self._rebuild_index_from_embeddings()
+
         log_info(f"Removed image: {image_path}")
         return {"ok": True, "message": "Success!"}
 
-    # ───────────────────────────── Capture ─────────────────────────────────
-
-    def capture_unknown(self, name: str) -> dict:
-        name = (name or "").strip().upper()
-        if not name:
-            return {"ok": False, "message": "Name is required."}
-
-        with self.capture_lock:
-            target, frame = self.latest_target, self.latest_frame_bytes
-
-        if not target or not frame:
-            return {"ok": False, "message": "No target face available."}
-
-        emb = np.asarray(target["embedding"], dtype=np.float32)
-        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ").strip().replace(" ", "_")
-        data_dir = os.path.join("data", "captures", safe_name)
-        os.makedirs(data_dir, exist_ok=True)
-
-        try:
-            self._save_capture_files(safe_name, data_dir, frame, target["bbox"])
-            self._update_cached_embedding(data_dir, emb)
-            updated_emb = self._load_cached_embedding(data_dir)
-            self._upsert_embedding(safe_name, updated_emb)
-            log_info(f"Captured face for {name}")
-        except Exception as e:
-            log_info(f"Capture failed for {name}: {e}")
-            return {"ok": False, "message": "Failed to save capture."}
-
-        return {"ok": True, "message": f"Captured {name} successfully."}
 
     def _save_capture_files(self, name: str, folder: str, frame: bytes, bbox: list[float]):
         # Save snapshot
@@ -386,22 +373,6 @@ class FRVidPlayer(VideoPlayer):
         crop = img.crop((l, t, r, b)) if r > l and b > t else img
         crop.save(os.path.join(folder, f"{name}_{datetime.now():%Y%m%d_%H%M%S}.jpg"), quality=95)
 
-    def _update_cached_embedding(self, folder: str, emb: np.ndarray) -> None:
-        cache_path = self._embedding_cache_path(folder)
-        try:
-            image_count = self._count_capture_images(folder)
-            prev_count = max(image_count - 1, 0)
-
-            if os.path.exists(cache_path):
-                prev = np.load(cache_path)
-                new_avg = (prev * prev_count + emb) / max(prev_count + 1, 1)
-            else:
-                new_avg = emb
-
-            np.save(cache_path, new_avg)
-        except Exception as e:
-            log_info(f"Embedding cache update failed: {folder} ({e})")
-
     def _update_capture_target(self, frame: bytes, embeddings: list, labels: list[str], bboxes: list) -> int | None:
         target_idx = None
         max_area = -1
@@ -415,7 +386,7 @@ class FRVidPlayer(VideoPlayer):
 
         with self.capture_lock:
             self.latest_frame_bytes = frame
-            self.latest_target = (
+            self.latest_target_detection = (
                 {"bbox": bboxes[target_idx], "embedding": np.asarray(embeddings[target_idx], dtype=np.float32)}
                 if target_idx is not None and target_idx < len(embeddings) else None
             )
@@ -442,10 +413,7 @@ class FRVidPlayer(VideoPlayer):
                 dists = [[1.0]] * len(faces)
             else:
                 k = min(2 if self.fr_settings.get("use_differentiator", False) else 1, len(self.name_list))
-                neighbors, dists = (
-                    self._brute_search(embeddings, k) if self.fr_settings.get("use_brute_force", False)
-                    else self.vector_index.query(embeddings, k=k)
-                )
+                neighbors, dists = self.vector_index.query(embeddings, k=k)
                 labels = self._match_labels(embeddings, neighbors, dists, bboxes)
 
             target_idx = self._update_capture_target(frame_bytes, embeddings, labels, bboxes)
@@ -528,19 +496,6 @@ class FRVidPlayer(VideoPlayer):
                 merged.append({"label": d["name"], "held": True})
                 result_labels.add(d["name"])
         return merged
-
-    def _brute_search(self, queries: list[np.ndarray], k: int) -> tuple[list, list]:
-        if not self.db_embeddings_normalized.size:
-            return [], []
-        neighbors, dists = [], []
-        for q in queries:
-            q_norm = self._norm(q)
-            cos_dist = 1 - np.dot(self.db_embeddings_normalized, q_norm)
-            idx = np.argpartition(cos_dist, min(k, len(cos_dist) - 1))[:k]
-            idx = idx[np.argsort(cos_dist[idx])]
-            neighbors.append(idx.tolist())
-            dists.append(cos_dist[idx].tolist())
-        return neighbors, dists
 
     @staticmethod
     def _norm(emb: np.ndarray) -> np.ndarray:

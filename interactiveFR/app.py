@@ -110,7 +110,6 @@ def submit_settings():
     new = {
         "threshold": float(request.form.get("threshold", s["threshold"])),
         "holding_time": float(request.form.get("holding_time", s["holding_time"])),
-        "use_brute_force": "use_brute_force" in request.form,
         "perf_logging": "perf_logging" in request.form,
         "use_differentiator": "use_differentiator" in request.form,
         "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),

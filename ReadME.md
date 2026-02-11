@@ -56,7 +56,7 @@ Copyright 2026 Fusion Company, 11C4I Battalion, Singapore Armed Forces
 ## Acknowledgements
 
 I would like to extend my gratitude to the following people and resources:
-- [**Cooleststar**](https://github.com/ruihongc): The long-time maintainer of FRS v2.0-v2.2. Without his efforts this project could not have survived for my generation to see.
+- [**Cooleststar**](https://github.com/cooleststar): The long-time maintainer of FRS v2.0-v2.2. Without his efforts this project could not have survived for my generation to see.
 - [**Ruihongc**](https://github.com/ruihongc): Suggesting the use of Spotify's Voyager led to much better faster embedding search compared to previous methods.
 - [**BabyWaffles**](https://github.com/BabyWaffles): Dockerization of simpliFRy was made possible by his extensive help.
 - [**Tabler Icons**](https://tabler.io/icons): Multiple icons from Tabler were used in the UI of both simpliFRy and Gotendance.
