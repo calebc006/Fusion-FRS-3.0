@@ -8,7 +8,6 @@ flask-Cors==5.0.0
 albumentations==2.0.8
 insightface==0.7.3
 numpy==1.24.4
-pillow==10.3.0
 python-dotenv==1.2.1
 waitress==3.0.2
 opencv-python-headless==4.9.0.80

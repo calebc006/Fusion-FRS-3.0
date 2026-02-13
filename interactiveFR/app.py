@@ -25,7 +25,7 @@ config = SimpleNamespace(
     ip=os.getenv("APP_IP", "0.0.0.0"),
     port=int(os.getenv("APP_PORT", "1334")),
     video=os.getenv("APP_VIDEO", "true").lower() == "true",
-    env=os.getenv("APP_ENV", "development").lower(), # "production" or "development"
+    env=os.getenv("APP_ENV", "production").lower(), # "production" or "development"
 )
 
 # Ensure fr_instance runs .cleanup() before process termination

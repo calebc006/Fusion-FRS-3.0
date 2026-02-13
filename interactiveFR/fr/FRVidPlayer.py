@@ -57,7 +57,7 @@ class RecentDetection(TypedDict):
     name: str
     bbox: list[float]
     norm_embed: np.ndarray
-    last_seen: datetime
+    last_seen: float
 
 
 class FRSettings(TypedDict):
@@ -89,23 +89,22 @@ class FRVidPlayer(VideoPlayer):
             providers=[provider],
             allowed_modules=["detection", "recognition"],
         )
-        self.model.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
 
+        self.model.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
+        self.fr_settings = self._load_settings()
+
+        # General state
         self.name_list = []
         self.embeddings_list = []
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
-        self.current_detections: list[RecentDetection] = []
-        self.old_detections: list[RecentDetection] = []
+        self.active_detections: dict[str, RecentDetection] = {}
+        self.embeddings_loaded = False
+        self.embeddings_loading = False
 
         # Capture state
         self.capture_lock = threading.Lock()
         self.latest_frame_bytes: bytes | None = None
         self.latest_target_detection: dict | None = None
-
-        # Settings
-        self.fr_settings = self._load_settings()
-        self.embeddings_loaded = False
-        self.embeddings_loading = False
 
         # Inference
         self.inference_lock = threading.Lock()
@@ -151,8 +150,7 @@ class FRVidPlayer(VideoPlayer):
 
         try:
             self._reset_index()
-            self.current_detections = []
-            self.old_detections = []
+            self.active_detections = {}
             self._load_captures()
 
             self.embeddings_loading = False
@@ -168,15 +166,8 @@ class FRVidPlayer(VideoPlayer):
         self.embeddings_list = []
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
 
-    def _rebuild_index_from_embeddings(self) -> None:
-        # Rebuild ANN index from in-memory embeddings
-        self.vector_index = Index(Space.Cosine, num_dimensions=512)
-
-        for emb in self.embeddings_list:
-            self.vector_index.add_item(emb)
-
     def _load_captures(self) -> int:
-        '''Reloads all images from cache, updates index (recomputes cache if not found)'''
+        '''Reload all images from cache, update index (recompute cache file if not found)'''
 
         root = os.path.join("data", "captures")
         if not os.path.isdir(root):
@@ -214,22 +205,22 @@ class FRVidPlayer(VideoPlayer):
     def _get_avg_embedding(self, folder: str) -> np.ndarray:
         embeddings = []
         images = self._list_capture_images(folder)
-        no_face = 0
 
         for img_name in images:
             try:
                 img_path = os.path.join(folder, img_name)
                 img = Image.open(img_path).convert("RGB")
+
                 faces = self.model.get(np.array(img))
+
                 if faces:
                     embeddings.append(faces[0].normed_embedding)
                 else:
-                    no_face += 1
+                    log_info(f"No face detected from {img_name}.")
+
             except Exception as e:
                 log_info(f"Capture image load failed: {img_name} ({e})")
-        if no_face and not embeddings:
-            log_info(f"No face detected in {no_face} capture image(s) from {folder}.")
-            
+        
         return np.mean(embeddings, axis=0) if embeddings else np.array([])
 
     def _load_cached_embedding(self, folder: str) -> np.ndarray | None:
@@ -286,9 +277,10 @@ class FRVidPlayer(VideoPlayer):
     
     # ───────────────────────────── Capture ─────────────────────────────────
     def capture_unknown(self, name: str) -> dict:
-        '''Captures the latest target'''
-        name = (name or "").strip().upper()
-        if not name:
+        '''Captures the latest target, saves image and updates the vector index'''
+
+        name = (name or "").strip()
+        if not name or name == "":
             return {"ok": False, "message": "Name is required."}
 
         with self.capture_lock:
@@ -296,9 +288,9 @@ class FRVidPlayer(VideoPlayer):
 
         if not detection or not frame:
             return {"ok": False, "message": "No target face available."}
-
-        emb = np.asarray(detection["embedding"], dtype=np.float32)
-        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ").strip().replace(" ", "_")
+        
+        # Process name: remove spaces, non-legal characters, converts to uppercase
+        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ").strip().replace(" ", "_").upper()
         data_dir = os.path.join("data", "captures", safe_name)
         os.makedirs(data_dir, exist_ok=True)
 
@@ -310,16 +302,17 @@ class FRVidPlayer(VideoPlayer):
             if safe_name in self.name_list:
                 idx = self.name_list.index(safe_name)
                 self.embeddings_list[idx] = updated_emb
+                self.vector_index.add_item(updated_emb, idx)
             else:
                 self.name_list.append(safe_name)
                 self.embeddings_list.append(updated_emb)
+                self.vector_index.add_item(updated_emb)
 
-            self._rebuild_index_from_embeddings()
-            log_info(f"Captured face for {name}")
-            return {"ok": True, "message": f"Captured {name} successfully."}
+            log_info(f"Captured face for {safe_name}")
+            return {"ok": True, "message": f"Captured {safe_name} successfully."}
 
         except Exception as e:
-            log_info(f"Capture failed for {name}: {e}")
+            log_info(f"Capture failed for {safe_name}: {e}")
             return {"ok": False, "message": "Failed to save capture."}
     
     def remove_capture_image(self, image_path: str) -> dict:
@@ -340,15 +333,19 @@ class FRVidPlayer(VideoPlayer):
         os.remove(target_path)
 
         emb = self._recompute_cached_embedding(person_dir)
-
         idx = self.name_list.index(display_name)
+
         if emb is None or not emb.size:
+            # Person has been completely removed
             self.name_list.pop(idx)
             self.embeddings_list.pop(idx)
-        else:
-            self.embeddings_list[idx] = emb
+            self.vector_index = Index(Space.Cosine, num_dimensions=512)
+            self.vector_index.add_items(self.embeddings_list)
 
-        self._rebuild_index_from_embeddings()
+        else:
+            # Image removed but others still exist; update embeddings
+            self.embeddings_list[idx] = emb
+            self.vector_index.add_item(emb, idx)
 
         log_info(f"Removed image: {image_path}")
         return {"ok": True, "message": "Success!"}
@@ -385,9 +382,12 @@ class FRVidPlayer(VideoPlayer):
                 max_area, target_idx = area, i
 
         with self.capture_lock:
-            self.latest_frame_bytes = frame
+            self.latest_frame_bytes = memoryview(frame)
             self.latest_target_detection = (
-                {"bbox": bboxes[target_idx], "embedding": np.asarray(embeddings[target_idx], dtype=np.float32)}
+                {
+                    "bbox": bboxes[target_idx], 
+                    "embedding": np.asarray(embeddings[target_idx], dtype=np.float32)
+                }
                 if target_idx is not None and target_idx < len(embeddings) else None
             )
         return target_idx
@@ -399,44 +399,61 @@ class FRVidPlayer(VideoPlayer):
             return []
 
         try:
-            img = np.array(Image.frombytes("RGB", (self.width, self.height), frame_bytes))
-            faces = self.model.get(img)
-            if not faces:
-                self._update_recent([])
-                return [{"label": l["name"], "held": True} for l in self.old_detections]
+            # Read frame, run model
+            frame = np.frombuffer(frame_bytes, np.uint8).reshape(
+                (self.height, self.width, 3)
+            )
+            faces = self.model.get(frame)
 
-            embeddings = [f.normed_embedding for f in faces]
-            bboxes = [self._frac_bbox(img.shape[1], img.shape[0], f.bbox.tolist()) for f in faces]
+            if faces:
+                embeddings = [f.normed_embedding for f in faces]
+                bboxes = [self._frac_bbox(frame.shape[1], frame.shape[0], f.bbox.tolist()) for f in faces]
 
-            if not self.name_list:
-                labels = ["Unknown"] * len(faces)
-                dists = [[1.0]] * len(faces)
+                if not self.name_list:
+                    labels = ["Unknown"] * len(faces)
+                    dists = [[1.0]] * len(faces)
+                else:
+                    k = min(2 if self.fr_settings.get("use_differentiator", False) else 1, len(self.name_list))
+                    neighbors, dists = self.vector_index.query(embeddings, k=k)
+                    labels = self._match_labels(embeddings, neighbors, dists, bboxes)
+
+                target_idx = self._update_capture_target(frame_bytes, embeddings, labels, bboxes)
+                
+                self._update_active_detections([
+                    {
+                        "name": labels[i], 
+                        "bbox": bboxes[i], 
+                        "norm_embed": self._norm(embeddings[i]), 
+                        "last_seen": time.monotonic()
+                    }
+                    for i in range(len(faces)) if labels[i] != "Unknown"
+                ])
+
+                results = [
+                    {
+                        "bbox": bboxes[i],
+                        "label": labels[i],
+                        "score": float(dists[i][0]),
+                        "is_target": i == target_idx,
+                        "held": False,
+                    }
+                    for i in range(len(faces))
+                ]
+
             else:
-                k = min(2 if self.fr_settings.get("use_differentiator", False) else 1, len(self.name_list))
-                neighbors, dists = self.vector_index.query(embeddings, k=k)
-                labels = self._match_labels(embeddings, neighbors, dists, bboxes)
+                self._update_active_detections([])
+                results = []
+            
+            # Append held
+            current_labels = {r["label"] for r in results}
+            now = time.monotonic()
+            cutoff = now - self.fr_settings["holding_time"]
 
-            target_idx = self._update_capture_target(frame_bytes, embeddings, labels, bboxes)
-            self._update_recent([
-                {
-                    "name": labels[i], 
-                    "bbox": bboxes[i], 
-                    "norm_embed": self._norm(embeddings[i]), 
-                    "last_seen": datetime.now()
-                }
-                for i in range(len(faces)) if labels[i] != "Unknown"
-            ])
+            for d in self.active_detections.values():
+                if d["name"] not in current_labels and d["last_seen"] > cutoff:
+                    results.append({"label": d["name"], "held": True})
 
-            return [
-                {
-                    "bbox": bboxes[i],
-                    "label": labels[i],
-                    "score": float(dists[i][0]),
-                    "is_target": i == target_idx,
-                    "held": False,
-                }
-                for i in range(len(faces))
-            ] + [{"label": l["name"], "held": True} for l in self.old_detections]
+            return results
 
         except Exception as e:
             log_info(f"Infer error: {e}\n{traceback.format_exc()}")
@@ -444,6 +461,7 @@ class FRVidPlayer(VideoPlayer):
 
     def _match_labels(self, embeddings, neighbors, dists, bboxes) -> list[str]:
         '''Matches detections to embeddings, optionally using the differentiator and persistor mechanics'''
+        
         labels = []
         s = self.fr_settings
         for i, dist in enumerate(dists):
@@ -459,9 +477,10 @@ class FRVidPlayer(VideoPlayer):
 
     def _catch_recent(self, emb: np.ndarray, score: float, bbox: list[float]) -> str | None:
         '''Implements the persistor mechanic'''
+        
         emb_norm = self._norm(emb)
         best_sim, match = 0, None
-        for r in self.current_detections + self.old_detections:
+        for r in self.active_detections.values():
             if calc_iou(r["bbox"], bbox) < self.fr_settings["threshold_iou"]:
                 continue
             sim = float(np.dot(emb_norm, r["norm_embed"]))
@@ -471,31 +490,23 @@ class FRVidPlayer(VideoPlayer):
             return match
         return None
 
-    def _update_recent(self, updated: list[RecentDetection]) -> list[str]:
+    def _update_active_detections(self, updated: list[RecentDetection]) -> None:
         '''
-        Updates self.current_detections based on the latest detections
-        Preserves previous detections in self.old_detections for holding_time
+        Updates self.active_detections based on the latest detections
+        Preserves previous detections for holding_time
         '''
-        preserved = []
-        updated_names = {d["name"] for d in updated}
-        cutoff = datetime.now() - timedelta(seconds=self.fr_settings["holding_time"])
-        for d in self.current_detections + self.old_detections:
-            if d["name"] not in updated_names and d["last_seen"] > cutoff:
-                preserved.append(d)
 
-        self.current_detections = updated
-        self.old_detections = preserved
+        now = time.monotonic()
+        cutoff = now - self.fr_settings["holding_time"]
 
-    def _merge_with_held(self, results: list[FRResult]) -> list[FRResult]:
-        """Append held detections that are still within holding_time."""
-        merged = list(results)
-        result_labels = {r["label"] for r in merged}
-        cutoff = datetime.now() - timedelta(seconds=self.fr_settings["holding_time"])
-        for d in self.old_detections:
-            if d["name"] not in result_labels and d["last_seen"] > cutoff:
-                merged.append({"label": d["name"], "held": True})
-                result_labels.add(d["name"])
-        return merged
+        # Remove expired
+        for name in list(self.active_detections.keys()):
+            if self.active_detections[name]["last_seen"] < cutoff:
+                del self.active_detections[name]
+
+        # Insert / update current
+        for d in updated:
+            self.active_detections[d["name"]] = d
 
     @staticmethod
     def _norm(emb: np.ndarray) -> np.ndarray:
@@ -517,6 +528,8 @@ class FRVidPlayer(VideoPlayer):
         self.inferenceThread.start()
 
     def _loop_inference(self) -> None:
+        '''Thread to continuously run inference on latest frames'''
+
         last_id, frame_cnt = -1, 0
 
         # Perf logging
@@ -563,7 +576,7 @@ class FRVidPlayer(VideoPlayer):
                 # Write inference results
                 with self.inference_lock:
                     self.fr_results = results
-                    self.broadcast_package = self._merge_with_held(results)
+                    self.broadcast_package = results
 
                 # Write perf log if it has been perf_interval_s since the last log
                 now = time.monotonic()
@@ -584,8 +597,7 @@ class FRVidPlayer(VideoPlayer):
                 log_info(f"Inference loop error: {e}")
 
         self._reset_index()
-        self.current_detections = []
-        self.old_detections = []
+        self.active_detections = {}
 
     def start_detection_broadcast(self) -> Generator[str, None, None]:
         last_send_time = 0
@@ -619,8 +631,7 @@ class FRVidPlayer(VideoPlayer):
             pass
 
         self._reset_index()
-        self.current_detections = []
-        self.old_detections = []
+        self.active_detections = {}
 
         force_exit = bool(_args)
         if not force_exit:
