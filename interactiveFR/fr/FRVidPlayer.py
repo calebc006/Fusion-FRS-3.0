@@ -541,7 +541,7 @@ class FRVidPlayer(VideoPlayer):
             # Cap rate of broadcast to MAX_BROADCAST_FPS
             now = time.monotonic()
             if now - last_send_time < 1 / self.fr_settings["max_broadcast_fps"]:
-                time.sleep(0.001)
+                time.sleep(0.005)
                 continue
 
             with self.inference_lock:
@@ -611,7 +611,7 @@ class FRVidPlayer(VideoPlayer):
                 # Skip inference if repeated frame, wait for a short time
                 if curr_id == last_id:
                     skipped_same_frame += 1
-                    time.sleep(0.001)
+                    time.sleep(0.005)
                     continue
 
                 last_id = curr_id

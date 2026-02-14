@@ -135,10 +135,23 @@ def get_settings():
     return _json(fr_instance.fr_settings)
 
 
-@app.route("/api/reference_images", methods=["GET"])
-def api_reference_images():
+@app.route("/api/get_reference_images", methods=["GET"])
+def get_reference_images():
     images = _collect_reference_images()
     return _json([{"name": n, "images": imgs} for n, imgs in sorted(images.items())])
+
+
+@app.route("/api/get_reference_names", methods=["GET"])
+def get_reference_names():
+    names = []
+
+    # From captures
+    captures_path = os.path.join("data", "captures")
+    if os.path.isdir(captures_path):
+        for name in os.listdir(captures_path):
+            names.append(name)
+
+    return _json(names)
 
 
 @app.route("/api/remove_image", methods=["POST"])

@@ -211,11 +211,12 @@ export const updateBBoxes = (videoContainer, detections, options = {}) => {
         if (showLabels) {
             let labelClass = "bbox-label bbox-label-identified";
             if (isTarget) {
-                labelClass = "bbox-label bbox-label-target";
+                bboxEl.innerHTML = `<p class="bbox-label bbox-label-target">TARGET</p>`;
             } else if (isUnknown) {
-                labelClass = "bbox-label bbox-label-unknown";
+                bboxEl.innerHTML = `<p class="bbox-label bbox-label-unknown">${detection.label} <span class="bbox-score">${detection.score?.toFixed(2) || ""}</span></p>`;
+            } else {
+                bboxEl.innerHTML = `<p class="bbox-label bbox-label-identified">${detection.label} <span class="bbox-score">${detection.score?.toFixed(2) || ""}</span></p>`;
             }
-            bboxEl.innerHTML = `<p class="${labelClass}">${detection.label} <span class="bbox-score">${detection.score?.toFixed(2) || ""}</span></p>`;
         } else {
             bboxEl.innerHTML = "";
         }

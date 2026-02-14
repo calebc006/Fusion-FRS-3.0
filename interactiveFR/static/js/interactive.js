@@ -172,14 +172,20 @@ captureBtn.addEventListener("click", async () => {
     const name = captureInput.value.trim();
     if (!name) return showCaptureToast("Enter a name first.", "error");
 
-    captureBtn.disabled = true;
+    const safeName = name
+    .replace(/[^a-zA-Z0-9\s_-]/g, "") // Remove non-legal (non-alnum, non-space, non-dash, non-underscore)
+    .trim()                           // Remove leading/trailing spaces
+    .replace(/\s+/g, "_")             // Replace internal spaces with underscores
+    .toUpperCase();                   // Convert to uppercase
+    
+    captureBtn.disabled = true;    
     showCaptureToast("Capturing...", "info");
 
     try {
         const res = await fetch("/api/capture", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({ name: safeName }),
         });
         const result = await res.json();
         showCaptureToast(
@@ -191,6 +197,14 @@ captureBtn.addEventListener("click", async () => {
         showCaptureToast("Capture failed.", "error");
     } finally {
         captureBtn.disabled = !hasTarget || !captureInput.value.trim();
+    }
+
+    // Check if name is already in database, warn if so
+    const response = await fetch("/api/get_reference_names");
+    const namelist = await response.json();
+    console.log(namelist);
+    if (namelist.includes(safeName)) {
+        alert(`Beware: ${safeName} was already in the database! If this was unintended, remove name and try again.`);
     }
 });
 

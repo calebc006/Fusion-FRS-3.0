@@ -83,7 +83,7 @@ async function loadReferenceImages({ preserveSelection = true } = {}) {
     const selectedValue = preserveSelection ? nameSelect.value : "";
 
     try {
-        const response = await fetch("/api/reference_images");
+        const response = await fetch("/api/get_reference_images");
         if (!response.ok) throw new Error("Failed to fetch reference images");
         imageData = await response.json();
 

@@ -112,7 +112,7 @@ button {
 }
 
 .bbox-label-unknown {
-    color: red;
+    display: none;
 }
 
 .bbox-label-identified {
