@@ -1,13 +1,15 @@
-# Real-time Facial Recognition System 3.0
+# Real-time Facial Recognition System 3
 
 
 ## Table of Contents
 
-- [Description](#description)
-- [Features](#features)
-- [Installation](#installation)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
+- [Real-time Facial Recognition System 3](#real-time-facial-recognition-system-3)
+  - [Table of Contents](#table-of-contents)
+  - [Description](#description)
+  - [Features](#features)
+  - [Installation](#installation)
+  - [License](#license)
+  - [Acknowledgements](#acknowledgements)
 
 ---
 

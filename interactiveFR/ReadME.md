@@ -74,13 +74,7 @@ APP_IP=0.0.0.0
 APP_PORT=1334
 APP_ENV=production # "production" or "development"
 
-# Video config (what ffmpeg uses, and what is streamed to /vidFeed)
-WIDTH=1920 
-HEIGHT=1080
-FPS=25
-
-# Input resolution for inferencez` 
+# Input resolution for inference 
 INFERENCE_WIDTH=640
 INFERENCE_HEIGHT=480
-
 ```
