@@ -6,12 +6,10 @@ import {
 
 const customRTSP = document.getElementById("stream_src_custom");
 const cameraSelect = document.getElementById("camera_device_select");
-let isEndingStream = false;
 
 window.addEventListener("DOMContentLoaded", async () => {
     try {
-        const status = await fetchStreamStatus();
-        if (status.stream_state === "running" && status.embeddings_loaded) {
+        if (localStorage.getItem("streamSrc") != null) {
             window.location.href = "/interactive";
         }
     } catch (error) {
@@ -20,14 +18,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 const endStreamAndReload = async () => {
-    if (isEndingStream) {
-        return;
-    }
-    isEndingStream = true;
     try {
         await fetch("/api/end", { method: "POST" });
     } catch {}
-    localStorage.removeItem("namelistPath");
+
     localStorage.removeItem("streamSrc");
     location.reload();
 };

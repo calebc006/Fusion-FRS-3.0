@@ -158,3 +158,41 @@ button {
     width: auto;
     margin-right: 20px;
 }
+
+/* Toast stuff */
+
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(35, 35, 50, 0.92);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+    pointer-events: none;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.is-success {
+    border: 1px solid #00d06c;
+}
+
+.toast.is-error {
+    border: 1px solid #d04a4a;
+}
+
+.toast.is-info {
+    border: 1px solid #2f7bdc;
+}

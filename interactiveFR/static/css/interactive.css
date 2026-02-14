@@ -8,20 +8,20 @@ body {
     bottom: 8px;
     left: 12px;
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.6);
     z-index: 50;
     pointer-events: none;
 }
 
 #video-container {
     position: absolute;
-    top: 5vh;
     margin: auto;
+    top: 0;
 }
 
 #video-feed {
-    height: 68vh;
-    border-radius: 10px;
+    height: 100vh;
+    margin: 0;
 }
 
 .table-detection-list {
@@ -36,12 +36,12 @@ body {
 
 #capture-panel {
     position: absolute;
-    bottom: 3vh;
+    bottom: 20px;
     margin: auto;
     width: 30vw;
     height: fit-content;
     padding: 16px;
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(0, 0, 0, 0.3);
     border: 2px solid #00d06c;
     border-radius: 10px;
     color: #fff;
@@ -65,7 +65,6 @@ body {
 
 .capture-status {
     font-size: 14px;
-    opacity: 0.9;
     margin-left: auto;
     text-align: right;
 }
@@ -117,42 +116,7 @@ body {
 .capture-message {
     font-size: 12px;
     min-height: 16px;
-}
-
-.capture-toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1200;
-    padding: 12px 16px;
-    border-radius: 10px;
-    background: rgba(35, 35, 50, 0.92);
-    color: #fff;
-    font-weight: 600;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    opacity: 0;
-    transform: translateY(-10px);
-    transition:
-        opacity 0.2s ease,
-        transform 0.2s ease;
-    pointer-events: none;
-}
-
-.capture-toast.show {
     opacity: 1;
-    transform: translateY(0);
-}
-
-.capture-toast.is-success {
-    border: 1px solid #00d06c;
-}
-
-.capture-toast.is-error {
-    border: 1px solid #d04a4a;
-}
-
-.capture-toast.is-info {
-    border: 1px solid #2f7bdc;
 }
 
 .table-detection-element {

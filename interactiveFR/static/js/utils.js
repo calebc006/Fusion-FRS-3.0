@@ -176,10 +176,12 @@ export const updateBBoxes = (videoContainer, detections, options = {}) => {
 
     const existingBoxes = videoContainer.querySelectorAll(".bbox");
     const bboxData = [];
+    const SCORE_THRESHOLD = 0.9
 
     // Filter detections with bboxes
     const detectionsWithBbox = detections.filter((d) => {
         if (!d.bbox) return false;
+        if (!d.score || d.score > SCORE_THRESHOLD) return false;
         if (!showUnknown && d.label === "Unknown") return false;
         return true;
     });
@@ -209,7 +211,6 @@ export const updateBBoxes = (videoContainer, detections, options = {}) => {
 
         // Update label content with matching classes
         if (showLabels) {
-            let labelClass = "bbox-label bbox-label-identified";
             if (isTarget) {
                 bboxEl.innerHTML = `<p class="bbox-label bbox-label-target">TARGET</p>`;
             } else if (isUnknown) {
@@ -284,4 +285,16 @@ export const waitForEmbeddings = async ({
         last_error: null,
         embeddings_loaded: false,
     };
+};
+
+export const showToast = (toast, message, type="info", duration_ms=3000) => {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.remove("is-success", "is-error", "is-info");
+    toast.classList.add(`is-${type}`);
+    toast.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+        toast.classList.remove("show");
+    }, duration_ms);
 };

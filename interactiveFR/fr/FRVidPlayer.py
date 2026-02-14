@@ -29,6 +29,8 @@ FR_DEFAULT_SETTINGS = {
     "perf_logging": False, 
     "frame_skip": 1, 
     "max_broadcast_fps": 50,
+    "video_width": 1920,
+    "video_height": 1080,
 
     "use_differentiator": True, 
     "threshold_lenient_diff": 0.55,
@@ -79,6 +81,8 @@ class FRSettings(TypedDict):
     threshold_lenient_pers: float
     frame_skip: int
     max_broadcast_fps: int
+    video_width: int
+    video_height: int
 
 
 class FRVidPlayer(VideoPlayer):
@@ -109,7 +113,8 @@ class FRVidPlayer(VideoPlayer):
         )
 
         # Index state
-        self.vector_index = Index(Space.Cosine, num_dimensions=512)
+        self.vector_index = None
+        self._init_index()
         self.idx_to_name = []
         self.embeddings_list = []
         
@@ -129,6 +134,9 @@ class FRVidPlayer(VideoPlayer):
         self.fr_results = []
 
         log_info(f"FR Model initialised! Input: {width}x{height}, {fps}fps; Inference: {inference_width}x{inference_height}")
+
+    def _init_index(self): 
+        self.vector_index = Index(Space.Cosine, num_dimensions=512)
 
     def adjust_values(self, new_settings: FRSettings) -> FRSettings:
         '''Adjust settings to new_settings'''
@@ -181,7 +189,7 @@ class FRVidPlayer(VideoPlayer):
     def _reset_index(self) -> None:
         self.idx_to_name = []
         self.embeddings_list = []
-        self.vector_index = Index(Space.Cosine, num_dimensions=512)
+        self._init_index()
 
     def _load_captures(self) -> int:
         '''Reload all images from cache, update index (recompute cache file if not found)'''
@@ -211,9 +219,9 @@ class FRVidPlayer(VideoPlayer):
                 emb = self._recompute_cached_embedding(person_dir)
 
             if emb is not None and emb.size:
+                self.vector_index.add_item(emb)
                 self.idx_to_name.append(name)
                 self.embeddings_list.append(emb)
-                self.vector_index.add_item(emb)
                 added += 1
 
         log_info(f"Loaded {added} capture embeddings from {scanned} images.")
@@ -254,8 +262,8 @@ class FRVidPlayer(VideoPlayer):
     def _recompute_cached_embedding(self, folder: str) -> np.ndarray | None:
         '''
         Recalculates average embedding from images in folder and updates cache. 
+        Returns the embedding if no issues arise, else returns None
         '''
-
         # Remove cache file and folder if no images
         images = self._list_capture_images(folder)
         if not images:
@@ -273,6 +281,7 @@ class FRVidPlayer(VideoPlayer):
                 log_info(f"Embedding cache save failed: {folder} ({e})")
             return emb
 
+        log_info(f"Embedding cache save failed unexpectedly.")
         return None
 
     @staticmethod
@@ -294,37 +303,55 @@ class FRVidPlayer(VideoPlayer):
         ]
     
     # ───────────────────────────── Capture ─────────────────────────────────
-    def capture_unknown(self, name: str) -> dict:
-        '''Captures the latest target, saves image and updates the vector index'''
-
+    def capture_unknown(self, name: str, allow_duplicate: bool=False, target_image=None) -> dict:
+        '''
+        Captures the latest target, saves image and updates the vector index.
+        If name is in database and allow_duplicate=False, returns target crop for retry.
+        If target_image specified, uses that instead of latest target detection.
+        '''
         name = (name or "").strip()
         if not name or name == "":
             return {"ok": False, "message": "Name is required."}
-
-        with self.capture_lock:
-            detection, frame = self.latest_target_detection, self.latest_frame_bytes
-
-        if not detection or not frame:
-            return {"ok": False, "message": "No target face available."}
         
-        # Process name: remove spaces, non-legal characters, converts to uppercase
+        # Process name: remove spaces, non-legal characters, convert to uppercase
         safe_name = "".join(c for c in name if c.isalnum() or c in "_- ").strip().replace(" ", "_").upper()
         data_dir = os.path.join("data", "captures", safe_name)
-        os.makedirs(data_dir, exist_ok=True)
+        current_names = os.listdir(os.path.join("data", "captures"))
 
-        try:
-            self._save_capture_files(safe_name, data_dir, frame, detection["bbox"])
-            self._recompute_cached_embedding(data_dir)
-            updated_emb = self._load_cached_embedding(data_dir)
+        # If not provided, store snapshot of current target using latest_target_detection
+        crop = target_image
+        if crop is None:
+            with self.capture_lock:
+                detection, frame = self.latest_target_detection, self.latest_frame_bytes
+            if not detection or not frame:
+                return {"ok": False, "message": "No target face available."}
             
+            crop = self._get_capture_image(frame, detection["bbox"])
+
+        # Check if name is already in database. Block if allow_duplicate=False
+        if safe_name in current_names:
+            if not allow_duplicate:
+                return {"ok": False, "message": f"{safe_name} is already in database!", "crop": crop}
+        else:
+            os.makedirs(data_dir, exist_ok=True)
+        
+        try:
+            # Save image, recompute cache for that name
+            img_path = os.path.join(data_dir, f"{safe_name}_{datetime.now():%Y%m%d_%H%M%S}.jpg")
+            cv2.imwrite(img_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+            updated_emb = self._recompute_cached_embedding(data_dir)
+            
+            # Update vector index
             if safe_name in self.idx_to_name:
                 idx = self.idx_to_name.index(safe_name)
                 self.embeddings_list[idx] = updated_emb
-                self.vector_index.add_item(updated_emb, idx)
             else:
                 self.idx_to_name.append(safe_name)
                 self.embeddings_list.append(updated_emb)
-                self.vector_index.add_item(updated_emb)
+
+            self._init_index()
+            self.vector_index.add_items(self.embeddings_list)
 
             log_info(f"Captured face for {safe_name}")
             return {"ok": True, "message": f"Captured {safe_name} successfully."}
@@ -354,22 +381,22 @@ class FRVidPlayer(VideoPlayer):
         idx = self.idx_to_name.index(display_name)
 
         if emb is None or not emb.size:
-            # Person has been completely removedl index needs to be reset
+            # Person has been completely removed
             self.idx_to_name.pop(idx)
             self.embeddings_list.pop(idx)
-            self.vector_index = Index(Space.Cosine, num_dimensions=512)
-            self.vector_index.add_items(self.embeddings_list)
 
         else:
             # Image removed but others still exist; update embeddings
             self.embeddings_list[idx] = emb
-            self.vector_index.add_item(emb, idx)
+
+        self._init_index()
+        self.vector_index.add_items(self.embeddings_list)
 
         log_info(f"Removed image: {image_path}")
         return {"ok": True, "message": "Success!"}
 
 
-    def _save_capture_files(self, name: str, folder: str, frame: bytes, bbox: list[float]):
+    def _get_capture_image(self, frame: bytes, bbox: list[float]):
         # Save snapshot
         img = np.frombuffer(frame, dtype=np.uint8).reshape(
             (self.height, self.width, 3)
@@ -391,8 +418,8 @@ class FRVidPlayer(VideoPlayer):
 
         crop = img[t:b, l:r]
         crop = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR) # convert to BGR before using cv2.imwrite
-        img_path = os.path.join(folder, f"{name}_{datetime.now():%Y%m%d_%H%M%S}.jpg")
-        cv2.imwrite(img_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+        return crop
 
     def _update_capture_target(self, frame: bytes, embeddings: list, labels: list[str], bboxes: list) -> int | None:
         target_idx = None

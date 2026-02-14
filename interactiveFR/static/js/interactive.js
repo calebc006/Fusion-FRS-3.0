@@ -1,4 +1,4 @@
-import { updateBBoxes, clearBBoxes, waitForStream, fetchStreamStatus } from "./utils.js";
+import { updateBBoxes, clearBBoxes, waitForStream, fetchStreamStatus, showToast } from "./utils.js";
 import { initReferencesUI, refreshReferenceImages } from "./references.js";
 
 // ───────────────────────────── State ─────────────────────────────────────
@@ -10,7 +10,7 @@ const captureHeader = document.querySelector(".capture-header");
 const captureInput = $("capture-name");
 const captureBtn = $("capture-button");
 const referencesPanelBtn = $("references-panel-button");
-const captureToast = $("capture-toast");
+const toast = $("toast");
 const videoFeed = $("video-feed");
 let isVideoReady = false;
 
@@ -156,55 +156,63 @@ captureInput.addEventListener(
     () => (captureBtn.disabled = !hasTarget || !captureInput.value.trim()),
 );
 
-const showCaptureToast = (message, type = "info") => {
-    if (!captureToast) return;
-    captureToast.textContent = message;
-    captureToast.classList.remove("is-success", "is-error", "is-info");
-    captureToast.classList.add(`is-${type}`);
-    captureToast.classList.add("show");
-    clearTimeout(showCaptureToast._timer);
-    showCaptureToast._timer = setTimeout(() => {
-        captureToast.classList.remove("show");
-    }, 3000);
-};
+
 
 captureBtn.addEventListener("click", async () => {
     const name = captureInput.value.trim();
-    if (!name) return showCaptureToast("Enter a name first.", "error");
+    if (!name) return showToast(toast, "Enter a name first.", "error");
 
     const safeName = name
-    .replace(/[^a-zA-Z0-9\s_-]/g, "") // Remove non-legal (non-alnum, non-space, non-dash, non-underscore)
+    .replace(/[^a-zA-Z0-9\s_-]/g, "") // Remove all non-legal (non-alnum, non-space, non-dash, non-underscore)
     .trim()                           // Remove leading/trailing spaces
     .replace(/\s+/g, "_")             // Replace internal spaces with underscores
     .toUpperCase();                   // Convert to uppercase
     
     captureBtn.disabled = true;    
-    showCaptureToast("Capturing...", "info");
+    showToast(toast, "Capturing...", "info");
 
     try {
+        // Capture first WITHOUT allowing duplicate
         const res = await fetch("/api/capture", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: safeName }),
+            body: JSON.stringify({ name: safeName, allow_duplicate: false }),
         });
-        const result = await res.json();
-        showCaptureToast(
+        let result = await res.json();
+        
+        // Check if we are blocking because of duplicate
+        if (res.status === 202) {
+            let allow = confirm(`Warning: ${safeName} is already in the database! Proceed?`);
+            if (allow) {
+                // Give confirmation
+                const new_res = await fetch("/api/capture/confirm", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: safeName, allow_duplicate: true }),
+                });
+                result = await new_res.json();
+            }
+            else {
+                // add back capture btn and exit
+                showToast(toast, "Canceled capture", "success");
+                captureBtn.disabled = !hasTarget || !captureInput.value.trim(); 
+                return;
+            }
+        }
+        
+        showToast(
+            toast, 
             result.message || "Done.",
             result.ok ? "success" : "error",
         );
-        if (result.ok) captureInput.value = "";
+
+        if (result.ok) 
+            captureInput.value = "";
+        
     } catch {
-        showCaptureToast("Capture failed.", "error");
+        showToast(toast, "Capture failed unexpectedly.", "error");
     } finally {
         captureBtn.disabled = !hasTarget || !captureInput.value.trim();
-    }
-
-    // Check if name is already in database, warn if so
-    const response = await fetch("/api/get_reference_names");
-    const namelist = await response.json();
-    console.log(namelist);
-    if (namelist.includes(safeName)) {
-        alert(`Beware: ${safeName} was already in the database! If this was unintended, remove name and try again.`);
     }
 });
 

@@ -98,13 +98,32 @@ def video_feed():
 def fr_results():
     return Response(fr_instance.start_detection_broadcast(), mimetype="application/json")
 
-
+prev_target = None
 @app.route("/api/capture", methods=["POST"])
 def capture():
-    payload = request.get_json(silent=True) or {}
-    name = payload.get("name") or request.form.get("name")
-    result = fr_instance.capture_unknown(name)
+    payload = request.get_json(silent=True)
+    name = payload.get("name")
+    allow_duplicate = payload.get("allow_duplicate") 
+    result = fr_instance.capture_unknown(name, allow_duplicate)
+    
+    # Check if capture_unknown gave us a target crop; if so we need user confirmation
+    global prev_target
+    prev_target = result.get("crop", None)
+    if prev_target is not None:
+        return _json({"ok": result.get("ok"), "message": result.get("message")}, 202)
+    
     return _json(result, 200 if result.get("ok") else 400)
+
+@app.route("/api/capture/confirm", methods=["POST"])
+def confirm_capture():
+    payload = request.get_json(silent=True)
+    name = payload.get("name")
+    allow = payload.get("allow_duplicate") # Flask auto parses JSON boolean!
+
+    if allow: 
+        result = fr_instance.capture_unknown(name, allow_duplicate=True, target_image=prev_target)
+        return _json(result, 200 if result.get("ok") else 400)
+    return _json({"ok": True, "message": "User cancelled capture operation"}, 200)
 
 
 @app.route("/api/submit_settings", methods=["POST"])
@@ -115,16 +134,20 @@ def submit_settings():
         "holding_time": float(request.form.get("holding_time", s["holding_time"])),
         "max_detections": int(request.form.get("max_detections", s["max_detections"])),
         "perf_logging": "perf_logging" in request.form,
+        "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
+        "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
+        "video_width": int(request.form.get("video_width", s["video_width"])),
+        "video_height": int(request.form.get("video_height", s["video_height"])),
+
         "use_differentiator": "use_differentiator" in request.form,
         "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
         "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
+        
         "use_persistor": "use_persistor" in request.form,
         "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
         "threshold_prev": float(request.form.get("threshold_prev", s["threshold_prev"])),
         "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
         "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
-        "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
-        "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
     }
     fr_instance.adjust_values(new)
     return redirect(url_for('settings'))

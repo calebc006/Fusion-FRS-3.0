@@ -96,6 +96,32 @@
           step="5"
           required
         />
+
+        <div class="break"></div>
+
+        <label for="video_width">Video Width</label>
+        <input
+          type="number"
+          id="video_width"
+          name="video_width"
+          value="{{ video_width }}"
+          min="100"
+          max="4096"
+          required
+        />
+
+        <div class="break"></div>
+
+        <label for="video_height">Video Height</label>
+        <input
+          type="number"
+          id="video_height"
+          name="video_height"
+          value="{{ video_height }}"
+          min="100"
+          max="4096"
+          required
+        />
       </fieldset>
 
       <fieldset class="form-section">

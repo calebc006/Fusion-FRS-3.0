@@ -1,4 +1,5 @@
 // Reference Images Viewer
+import { showToast } from "./utils.js";
 
 let imageData = [];
 let initialized = false;
@@ -8,6 +9,7 @@ const imageGallery = document.getElementById("image-gallery");
 const imageCount = document.getElementById("image-count");
 const noImages = document.getElementById("no-images");
 
+const toast = document.getElementById("toast");
 const lightbox = document.getElementById("lightbox");
 const lightboxImg = lightbox?.querySelector("img");
 const lightboxCloseBtn = lightbox?.querySelector(".lightbox-close");
@@ -207,6 +209,8 @@ function createImageCard(name, imgPath) {
 
         deleteBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
+            showToast(toast, "Removing image...", "info")
+            
             const relativePath = imgPath.replace("/data/captures", "");
             const res = await fetch("/api/remove_image", {
                 method: 'POST',
@@ -215,11 +219,14 @@ function createImageCard(name, imgPath) {
                 },
                 body: JSON.stringify({"image_path": relativePath}),
             });
-
+            
             if (res.ok) {
+                showToast(toast, `Removed image: ${filename}`, "success")
                 removeImageFromData(imgPath);
                 handleLightboxClose();
                 refreshView();
+            } else {
+                showToast(toast, "Removal failed", "error");
             }
         })
     });
