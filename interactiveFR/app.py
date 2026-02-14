@@ -18,13 +18,18 @@ app = Flask(__name__)
 CORS(app) 
 
 log_info("Starting FR Session")
-fr_instance = FRVidPlayer()
+fr_instance = FRVidPlayer(
+    width=int(os.getenv("WIDTH", "1920")),
+    height=int(os.getenv("HEIGHT", "1080")),
+    fps=int(os.getenv("FPS", "25")),
+    inference_width=int(os.getenv("INFERENCE_WIDTH", "640")),
+    inference_height=int(os.getenv("INFERENCE_HEIGHT", "480")),
+)
 
 # Config from environment (can be overridden by argparse)
 config = SimpleNamespace(
     ip=os.getenv("APP_IP", "0.0.0.0"),
     port=int(os.getenv("APP_PORT", "1334")),
-    video=os.getenv("APP_VIDEO", "true").lower() == "true",
     env=os.getenv("APP_ENV", "production").lower(), # "production" or "development"
 )
 
@@ -34,7 +39,7 @@ atexit.register(fr_instance.cleanup)
 
 # ───────────────────────────── API Routes ─────────────────────────────────
 
-@app.route("/start", methods=["POST"])
+@app.route("/api/start", methods=["POST"])
 def start():
     """API for frontend to start FR"""
 
@@ -62,7 +67,7 @@ def start():
     return _json({"stream": True, "message": "Success!"})
 
 
-@app.route("/end", methods=["POST"])
+@app.route("/api/end", methods=["POST"])
 def end():
     """API for frontend to end FR"""
 
@@ -73,7 +78,7 @@ def end():
     return _json({"stream": True, "message": "Success!"})
 
 
-@app.route("/streamStatus", methods=["GET"])
+@app.route("/api/streamStatus", methods=["GET"])
 def stream_status():
     """API to check stream state and last error"""
 
@@ -84,19 +89,17 @@ def stream_status():
         "embeddings_loading": getattr(fr_instance, "embeddings_loading", False),
     })
 
-@app.route("/vidFeed", methods=["GET"])
+@app.route("/api/vidFeed", methods=["GET"])
 def video_feed():
-    if not config.video:
-        return Response("Video disabled", status=405)
     return Response(fr_instance.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.route("/frResults", methods=["GET"])
+@app.route("/api/frResults", methods=["GET"])
 def fr_results():
     return Response(fr_instance.start_detection_broadcast(), mimetype="application/json")
 
 
-@app.route("/capture", methods=["POST"])
+@app.route("/api/capture", methods=["POST"])
 def capture():
     payload = request.get_json(silent=True) or {}
     name = payload.get("name") or request.form.get("name")
@@ -104,17 +107,19 @@ def capture():
     return _json(result, 200 if result.get("ok") else 400)
 
 
-@app.route("/submit_settings", methods=["POST"])
+@app.route("/api/submit_settings", methods=["POST"])
 def submit_settings():
     s = fr_instance.fr_settings
     new = {
         "threshold": float(request.form.get("threshold", s["threshold"])),
         "holding_time": float(request.form.get("holding_time", s["holding_time"])),
+        "max_detections": int(request.form.get("max_detections", s["max_detections"])),
         "perf_logging": "perf_logging" in request.form,
         "use_differentiator": "use_differentiator" in request.form,
         "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
         "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
         "use_persistor": "use_persistor" in request.form,
+        "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
         "threshold_prev": float(request.form.get("threshold_prev", s["threshold_prev"])),
         "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
         "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
@@ -125,13 +130,18 @@ def submit_settings():
     return redirect(url_for('settings'))
 
 
-@app.route("/reference_images", methods=["GET"])
+@app.route("/api/get_settings", methods=["GET"])
+def get_settings():
+    return _json(fr_instance.fr_settings)
+
+
+@app.route("/api/reference_images", methods=["GET"])
 def api_reference_images():
     images = _collect_reference_images()
     return _json([{"name": n, "images": imgs} for n, imgs in sorted(images.items())])
 
 
-@app.route("/remove_image", methods=["POST"])
+@app.route("/api/remove_image", methods=["POST"])
 def remove_image():
     payload = request.get_json(silent=True) or {}
     image_path = payload.get("image_path")
@@ -148,7 +158,8 @@ def remove_image():
         return _json({"message": result.get("message", "Success!")})
     return _json({"message": result.get("message", "Invalid image_path")}, 400)
 
-@app.route("/listCameras")
+
+@app.route("/api/listCameras", methods=["GET"])
 def list_cameras():
     """API to list available camera devices"""
     response = jsonify(VideoSource.list_cameras())
@@ -213,7 +224,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Facial Recognition")
     parser.add_argument("-ip", "--ipaddress", type=str)
     parser.add_argument("-p", "--port", type=int)
-    parser.add_argument("-v", "--video", type=str)
     parser.add_argument("--env", type=str, choices=["development", "production"])
     parser.add_argument("--prod", action="store_true")
     args = parser.parse_args()
@@ -222,8 +232,6 @@ if __name__ == "__main__":
         config.ip = args.ipaddress
     if args.port:
         config.port = args.port
-    if args.video:
-        config.video = args.video.lower() == "true"
     if args.env:
         config.env = args.env
     if args.prod:

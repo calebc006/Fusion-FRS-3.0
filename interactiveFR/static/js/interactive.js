@@ -25,7 +25,7 @@ const tryRestartStream = async () => {
     const formData = new FormData();
     formData.set("stream_src", streamSrc);
 
-    const response = await fetch("/start", { method: "POST", body: formData });
+    const response = await fetch("/api/start", { method: "POST", body: formData });
     const data = await response.json();
     if (!data.stream) {
         return {
@@ -61,7 +61,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         // cache-buster to prevent getting stuck by browser caching
-        videoFeed?.setAttribute("data", `/vidFeed?t=${Date.now()}`);
+        videoFeed?.setAttribute("data", `/api/vidFeed?t=${Date.now()}`);
 
         videoFeed?.addEventListener("load", () => {
             isVideoReady = true;
@@ -87,7 +87,7 @@ const fetchDetections = () => {
     let buffer = "";
     let data = [];
 
-    fetch("/frResults")
+    fetch("/api/frResults")
         .then((response) => {
             if (!response.ok || !response.body) {
                 console.error("Fetch failed, retrying...");
@@ -176,7 +176,7 @@ captureBtn.addEventListener("click", async () => {
     showCaptureToast("Capturing...", "info");
 
     try {
-        const res = await fetch("/capture", {
+        const res = await fetch("/api/capture", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name }),

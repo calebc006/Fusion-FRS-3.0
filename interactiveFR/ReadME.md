@@ -7,18 +7,15 @@
 ## Table of Contents
 
 - [InteractiveFR](#interactivefr)
-    - [Table of Contents](#table-of-contents)
-    - [Description](#description)
-    - [Install](#install)
-        - [Prerequisites](#prerequisites)
-        - [Docker](#docker)
-        - [Local](#local)
-    - [Run](#run)
-        - [Docker](#docker-1)
-        - [Local](#local-1)
-    - [Pages](#pages)
-    - [Data](#data)
-        - [`.env`](#env)
+  - [Table of Contents](#table-of-contents)
+  - [Description](#description)
+  - [Install and Run](#install-and-run)
+    - [Prerequisites](#prerequisites)
+    - [Docker](#docker)
+    - [Local](#local)
+  - [Pages](#pages)
+  - [Data](#data)
+    - [`.env`](#env)
 
 ---
 
@@ -28,18 +25,20 @@
 
 ---
 
-## Install
+## Install and Run
 
 ### Prerequisites
 
-- [Python 3.10](https://www.python.org/downloads/)
-- [FFmpeg 8.0.1](https://www.ffmpeg.org/download.html)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional)
+- [Python 3.10](https://www.python.org/downloads/) (support not confirmed for later versions)
+- [FFmpeg 8.0.1](https://www.ffmpeg.org/download.html) (support not confirmed for later versions)
+- [Docker](https://www.docker.com/products/docker-desktop/) (optional)
 
 ### Docker
 
 ```bash
 docker compose build
+
+docker compose up 
 ```
 
 ### Local
@@ -48,27 +47,11 @@ docker compose build
 py -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-```
 
----
-
-## Run
-
-### Docker
-
-```bash
-docker compose up --no-build
-```
-
-### Local
-
-```bash
 python app.py
 ```
+Open <http://localhost:1334>.
 
-Open <http://127.0.0.1:1334>.
-
----
 
 ## Pages
 
@@ -80,15 +63,24 @@ Open <http://127.0.0.1:1334>.
 ---
 
 ## Data
-
-- Captures are stored in `data/captures/<NAME>/` and served at `/data/...`.
-- Logs are written to `data/logs/` per session.
+- Captures are stored in `data/captures/<NAME>/` and served at `/data/...`
+- Logs are written to `data/logs/` per session
+- The whole `/data` directory is a docker volume so its contents are persisted if using docker
 
 ### `.env`
-
-```
+Refer to .env.example
+```py
 APP_IP=0.0.0.0
 APP_PORT=1334
-APP_VIDEO=true
-APP_ENV=production
+APP_ENV=production # "production" or "development"
+
+# Video config (what ffmpeg uses, and what is streamed to /vidFeed)
+WIDTH=1920 
+HEIGHT=1080
+FPS=25
+
+# Input resolution for inferencez` 
+INFERENCE_WIDTH=640
+INFERENCE_HEIGHT=480
+
 ```

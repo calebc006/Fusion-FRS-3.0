@@ -168,8 +168,11 @@ class VideoSource:
 
                     # Low-latency DirectShow settings
                     "-f", "dshow",
-                    "-rtbufsize", "256M",
-                    "-thread_queue_size", "512",
+                    "-fflags", "nobuffer",
+                    "-flags", "low_delay",
+                    "-probesize", "32",
+                    "-analyzeduration", "0",
+                    "-thread_queue_size", "1",
 
                     # Input device and scaling
                     "-i", f"video={device_name}",
@@ -195,8 +198,11 @@ class VideoSource:
 
                     # Low-latency v4l2 settings
                     "-f", "dshow",
-                    "-rtbufsize", "256M",
-                    "-thread_queue_size", "512",
+                    "-fflags", "nobuffer",
+                    "-flags", "low_delay",
+                    "-probesize", "32",
+                    "-analyzeduration", "0",
+                    "-thread_queue_size", "1",
 
                     # Input device and scaling
                     "-i", device_name,
@@ -221,7 +227,7 @@ class VideoPlayer:
     Class for streaming video from ffmpeg
     """
 
-    def __init__(self) -> None:
+    def __init__(self, width, height, fps) -> None:
         # For modifiables
         self.vid_lock = RWLock()  # RWLock for concurrent read access
         self.frame_bytes = b"" 
@@ -235,10 +241,10 @@ class VideoPlayer:
 
         # Set resolution and framerate that ffmpeg will convert video source to
         # This is the resolution and framerate that will be broadcast
-        self.width = 1280
-        self.height = 720
+        self.width = width
+        self.height = height
         self.frame_size = self.width * self.height * 3
-        self.fps = 25
+        self.fps = fps
         
         self.stream_state = StreamState.IDLE
         self.last_error = None
@@ -329,8 +335,7 @@ class VideoPlayer:
         - ffmpeg_command: FFmpeg command in list form for streaming to RGB bytes.
         """
 
-        log_info(f"FFmpeg command: {ffmpeg_command}")
-
+        # log_info(f"FFmpeg command: {ffmpeg_command}")
         ffmpeg_process = None
 
         # Main try/except 
@@ -411,7 +416,6 @@ class VideoPlayer:
         if self.stream_state != StreamState.FAILED:
             log_info(f"Stream ended peacefully")
             self.stream_state = StreamState.IDLE
-
 
         return
 

@@ -11,7 +11,7 @@
   </head>
   <body>
     <h1 class="title">Facial Recognition Settings</h1>
-    <form class="form" action="/submit_settings" method="POST">
+    <form class="form" action="/api/submit_settings" method="POST">
       <fieldset class="form-section">
         <legend>Default Parameters</legend>
 
@@ -37,6 +37,20 @@
           min="1"
           max="120"
           step="0.1"
+          required
+        />
+
+        <div class="break"></div>
+
+        <label for="max_detections">Max Detections</label>
+        <input
+          type="number"
+          id="max_detections"
+          name="max_detections"
+          value="{{ max_detections }}"
+          min="1"
+          max="100"
+          step="1"
           required
         />
 
@@ -145,6 +159,19 @@
           %}checked{%
           endif
           %}
+        />
+        <div class="break"></div>
+
+        <label for="q_max_size">Max Queue Size</label>
+        <input
+          type="number"
+          class="persistor-inputs"
+          id="q_max_size"
+          name="q_max_size"
+          value="{{ q_max_size }}"
+          min="10"
+          max="500"
+          step="10"
         />
         <div class="break"></div>
 

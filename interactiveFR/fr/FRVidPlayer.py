@@ -9,8 +9,9 @@ from datetime import datetime, timedelta
 from typing import Generator, TypedDict
 import subprocess
 import logging
+from collections import deque
 import numpy as np
-from PIL import Image
+import cv2
 from insightface.app import FaceAnalysis
 from voyager import Index, Space
 
@@ -24,6 +25,7 @@ FR_SETTINGS_PATH = 'settings.json'
 FR_DEFAULT_SETTINGS = {
     "threshold": 0.45, 
     "holding_time": 2, 
+    "max_detections": 50, 
     "perf_logging": False, 
     "frame_skip": 1, 
     "max_broadcast_fps": 50,
@@ -33,6 +35,7 @@ FR_DEFAULT_SETTINGS = {
     "similarity_gap": 0.10, 
 
     "use_persistor": True, 
+    "q_max_size": 100,
     "threshold_prev": 0.4,
     "threshold_iou": 0.7, 
     "threshold_lenient_pers": 0.60, 
@@ -47,9 +50,10 @@ def is_cuda_available() -> bool:
 
 
 class FRResult(TypedDict, total=False):
-    bboxes: list[float]
-    labels: str
+    bbox: list[float]
+    label: str
     score: float
+    last_seen: float
     is_target: bool
 
 
@@ -64,10 +68,12 @@ class FRSettings(TypedDict):
     threshold: float
     holding_time: int
     perf_logging: bool
+    max_detections: int
     use_differentiator: bool
     threshold_lenient_diff: float
     similarity_gap: float
     use_persistor: bool
+    q_max_size: int
     threshold_prev: float
     threshold_iou: float
     threshold_lenient_pers: float
@@ -76,10 +82,13 @@ class FRSettings(TypedDict):
 
 
 class FRVidPlayer(VideoPlayer):
-    """Facial recognition video player using InsightFace and Voyager vector index."""
+    '''Facial recognition video player using InsightFace and Voyager vector index.'''
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, width: int, height: int, fps: int, inference_width: int, inference_height: int) -> None:
+        # This is the size of self.frame (which is broadcast)
+        super().__init__(width=width, height=height, fps=fps)
+        self.fr_settings = self._load_settings()
+
         warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.transform")
         warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\.utils\.face_align")
 
@@ -90,18 +99,26 @@ class FRVidPlayer(VideoPlayer):
             allowed_modules=["detection", "recognition"],
         )
 
-        self.model.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
-        self.fr_settings = self._load_settings()
+        # This is the size that images are rescaled to before inference is run
+        self.INFERENCE_WIDTH = inference_width
+        self.INFERENCE_HEIGHT = inference_height
+        self.model.prepare(
+            ctx_id=0, 
+            det_size=(inference_width, inference_height), 
+            det_thresh=0.5,
+        )
 
-        # General state
-        self.name_list = []
-        self.embeddings_list = []
+        # Index state
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
-        self.active_detections: dict[str, RecentDetection] = {}
+        self.idx_to_name = []
+        self.embeddings_list = []
+        
+        # Other state
+        self.old_detections: deque[RecentDetection] = deque(maxlen=self.fr_settings["q_max_size"])
         self.embeddings_loaded = False
         self.embeddings_loading = False
 
-        # Capture state
+        # Capture 
         self.capture_lock = threading.Lock()
         self.latest_frame_bytes: bytes | None = None
         self.latest_target_detection: dict | None = None
@@ -110,9 +127,8 @@ class FRVidPlayer(VideoPlayer):
         self.inference_lock = threading.Lock()
         self.inferenceThread = None
         self.fr_results = []
-        self.broadcast_package = []
 
-        log_info("FR Model initialised!")
+        log_info(f"FR Model initialised! Input: {width}x{height}, {fps}fps; Inference: {inference_width}x{inference_height}")
 
     def adjust_values(self, new_settings: FRSettings) -> FRSettings:
         '''Adjust settings to new_settings'''
@@ -150,11 +166,12 @@ class FRVidPlayer(VideoPlayer):
 
         try:
             self._reset_index()
-            self.active_detections = {}
+            self.old_detections: deque[RecentDetection] = deque(maxlen=self.fr_settings["q_max_size"])
             self._load_captures()
 
             self.embeddings_loading = False
             self.embeddings_loaded = True
+            
         except:
             self.embeddings_loading = False
             self.embeddings_loaded = False
@@ -162,7 +179,7 @@ class FRVidPlayer(VideoPlayer):
             log_info("Failed to load embeddings!")
 
     def _reset_index(self) -> None:
-        self.name_list = []
+        self.idx_to_name = []
         self.embeddings_list = []
         self.vector_index = Index(Space.Cosine, num_dimensions=512)
 
@@ -194,7 +211,7 @@ class FRVidPlayer(VideoPlayer):
                 emb = self._recompute_cached_embedding(person_dir)
 
             if emb is not None and emb.size:
-                self.name_list.append(name)
+                self.idx_to_name.append(name)
                 self.embeddings_list.append(emb)
                 self.vector_index.add_item(emb)
                 added += 1
@@ -209,9 +226,10 @@ class FRVidPlayer(VideoPlayer):
         for img_name in images:
             try:
                 img_path = os.path.join(folder, img_name)
-                img = Image.open(img_path).convert("RGB")
 
-                faces = self.model.get(np.array(img))
+                img = cv2.imread(img_path)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # Convert to RGB after using cv2.imread
+                faces = self.model.get(img)
 
                 if faces:
                     embeddings.append(faces[0].normed_embedding)
@@ -299,12 +317,12 @@ class FRVidPlayer(VideoPlayer):
             self._recompute_cached_embedding(data_dir)
             updated_emb = self._load_cached_embedding(data_dir)
             
-            if safe_name in self.name_list:
-                idx = self.name_list.index(safe_name)
+            if safe_name in self.idx_to_name:
+                idx = self.idx_to_name.index(safe_name)
                 self.embeddings_list[idx] = updated_emb
                 self.vector_index.add_item(updated_emb, idx)
             else:
-                self.name_list.append(safe_name)
+                self.idx_to_name.append(safe_name)
                 self.embeddings_list.append(updated_emb)
                 self.vector_index.add_item(updated_emb)
 
@@ -333,11 +351,11 @@ class FRVidPlayer(VideoPlayer):
         os.remove(target_path)
 
         emb = self._recompute_cached_embedding(person_dir)
-        idx = self.name_list.index(display_name)
+        idx = self.idx_to_name.index(display_name)
 
         if emb is None or not emb.size:
-            # Person has been completely removed
-            self.name_list.pop(idx)
+            # Person has been completely removedl index needs to be reset
+            self.idx_to_name.pop(idx)
             self.embeddings_list.pop(idx)
             self.vector_index = Index(Space.Cosine, num_dimensions=512)
             self.vector_index.add_items(self.embeddings_list)
@@ -353,7 +371,10 @@ class FRVidPlayer(VideoPlayer):
 
     def _save_capture_files(self, name: str, folder: str, frame: bytes, bbox: list[float]):
         # Save snapshot
-        img = Image.frombytes("RGB", (self.width, self.height), frame)
+        img = np.frombuffer(frame, dtype=np.uint8).reshape(
+            (self.height, self.width, 3)
+        )
+
         l = max(int(bbox[0] * self.width), 0)
         t = max(int(bbox[1] * self.height), 0)
         r = min(int(bbox[2] * self.width), self.width)
@@ -364,11 +385,14 @@ class FRVidPlayer(VideoPlayer):
         pad_x = int(bw * 0.7)
         pad_y = int(bh * 0.7)
         l = max(l - pad_x, 0)
-        t = max(t - pad_y, 0)
         r = min(r + pad_x, self.width)
+        t = max(t - pad_y, 0)
         b = min(b + pad_y, self.height)
-        crop = img.crop((l, t, r, b)) if r > l and b > t else img
-        crop.save(os.path.join(folder, f"{name}_{datetime.now():%Y%m%d_%H%M%S}.jpg"), quality=95)
+
+        crop = img[t:b, l:r]
+        crop = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR) # convert to BGR before using cv2.imwrite
+        img_path = os.path.join(folder, f"{name}_{datetime.now():%Y%m%d_%H%M%S}.jpg")
+        cv2.imwrite(img_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 100])
 
     def _update_capture_target(self, frame: bytes, embeddings: list, labels: list[str], bboxes: list) -> int | None:
         target_idx = None
@@ -403,57 +427,51 @@ class FRVidPlayer(VideoPlayer):
             frame = np.frombuffer(frame_bytes, np.uint8).reshape(
                 (self.height, self.width, 3)
             )
-            faces = self.model.get(frame)
+            resized_frame = cv2.resize(frame, (self.INFERENCE_WIDTH, self.INFERENCE_HEIGHT))
+            faces = self.model.get(resized_frame)
+            faces.sort(key=lambda x: x.det_score)
+            faces = faces[:self.fr_settings["max_detections"]] # Limit to top few detections
 
-            if faces:
-                embeddings = [f.normed_embedding for f in faces]
-                bboxes = [self._frac_bbox(frame.shape[1], frame.shape[0], f.bbox.tolist()) for f in faces]
-
-                if not self.name_list:
-                    labels = ["Unknown"] * len(faces)
-                    dists = [[1.0]] * len(faces)
-                else:
-                    k = min(2 if self.fr_settings.get("use_differentiator", False) else 1, len(self.name_list))
-                    neighbors, dists = self.vector_index.query(embeddings, k=k)
-                    labels = self._match_labels(embeddings, neighbors, dists, bboxes)
-
-                target_idx = self._update_capture_target(frame_bytes, embeddings, labels, bboxes)
-                
-                self._update_active_detections([
-                    {
-                        "name": labels[i], 
-                        "bbox": bboxes[i], 
-                        "norm_embed": self._norm(embeddings[i]), 
-                        "last_seen": time.monotonic()
-                    }
-                    for i in range(len(faces)) if labels[i] != "Unknown"
-                ])
-
-                results = [
-                    {
-                        "bbox": bboxes[i],
-                        "label": labels[i],
-                        "score": float(dists[i][0]),
-                        "is_target": i == target_idx,
-                        "held": False,
-                    }
-                    for i in range(len(faces))
-                ]
-
-            else:
-                self._update_active_detections([])
-                results = []
+            # No current detections; update and return
+            if not faces or len(faces) == 0:
+                self._update_old_detections([])
+                return []
             
-            # Append held
-            current_labels = {r["label"] for r in results}
-            now = time.monotonic()
-            cutoff = now - self.fr_settings["holding_time"]
+            embeddings = [f.normed_embedding for f in faces]
+            bboxes = [self._frac_bbox(self.INFERENCE_WIDTH, self.INFERENCE_HEIGHT, f.bbox.tolist()) for f in faces]
 
-            for d in self.active_detections.values():
-                if d["name"] not in current_labels and d["last_seen"] > cutoff:
-                    results.append({"label": d["name"], "held": True})
+            if not self.idx_to_name:
+                labels = ["Unknown"] * len(faces)
+                dists = [[1.0]] * len(faces)
+            else:
+                k = min(2 if self.fr_settings["use_differentiator"] else 1, len(self.idx_to_name))
+                neighbors, dists = self.vector_index.query(embeddings, k=k)
+                labels = self._match_labels(embeddings, neighbors, dists, bboxes)
 
-            return results
+            target_idx = self._update_capture_target(frame_bytes, embeddings, labels, bboxes)
+            
+            # Store all non-unknown detections
+            self._update_old_detections([
+                {
+                    "name": labels[i], 
+                    "bbox": bboxes[i], 
+                    "norm_embed": embeddings[i], 
+                    "last_seen": time.monotonic()
+                }
+                for i in range(len(faces)) if labels[i] != "Unknown"
+            ])
+
+            # Return a list of FRResult
+            return [
+                {
+                    "bbox": bboxes[i],
+                    "label": labels[i],
+                    "score": float(dists[i][0]),
+                    "last_seen": time.monotonic(),
+                    "is_target": i == target_idx
+                }
+                for i in range(len(faces))
+            ]
 
         except Exception as e:
             log_info(f"Infer error: {e}\n{traceback.format_exc()}")
@@ -461,52 +479,41 @@ class FRVidPlayer(VideoPlayer):
 
     def _match_labels(self, embeddings, neighbors, dists, bboxes) -> list[str]:
         '''Matches detections to embeddings, optionally using the differentiator and persistor mechanics'''
-        
         labels = []
         s = self.fr_settings
         for i, dist in enumerate(dists):
             match = None
             if dist[0] < s["threshold"]:
-                match = self.name_list[neighbors[i][0]]
+                match = self.idx_to_name[neighbors[i][0]]
             elif s["use_differentiator"] and dist[0] < s["threshold_lenient_diff"] and len(dist) > 1 and (dist[1] - dist[0]) > s["similarity_gap"]:
-                match = self.name_list[neighbors[i][0]]
+                match = self.idx_to_name[neighbors[i][0]]
             elif s["use_persistor"]:
                 match = self._catch_recent(embeddings[i], dist[0], bboxes[i])
             labels.append(match or "Unknown")
         return labels
 
-    def _catch_recent(self, emb: np.ndarray, score: float, bbox: list[float]) -> str | None:
+    def _catch_recent(self, emb_norm: np.ndarray, score: float, bbox: list[float]) -> str | None:
         '''Implements the persistor mechanic'''
         
-        emb_norm = self._norm(emb)
         best_sim, match = 0, None
-        for r in self.active_detections.values():
+        for r in self.old_detections:
             if calc_iou(r["bbox"], bbox) < self.fr_settings["threshold_iou"]:
                 continue
             sim = float(np.dot(emb_norm, r["norm_embed"]))
             if sim > best_sim:
                 best_sim, match = sim, r["name"]
+
         if best_sim > (1 - self.fr_settings["threshold_prev"]) and score < self.fr_settings["threshold_lenient_pers"]:
+            # log_info(f"Persistor hit! {score}")
             return match
         return None
 
-    def _update_active_detections(self, updated: list[RecentDetection]) -> None:
+    def _update_old_detections(self, current_detections: list[RecentDetection]) -> None:
         '''
-        Updates self.active_detections based on the latest detections
-        Preserves previous detections for holding_time
+        Updates old_detections based on the latest detections
         '''
-
-        now = time.monotonic()
-        cutoff = now - self.fr_settings["holding_time"]
-
-        # Remove expired
-        for name in list(self.active_detections.keys()):
-            if self.active_detections[name]["last_seen"] < cutoff:
-                del self.active_detections[name]
-
-        # Insert / update current
-        for d in updated:
-            self.active_detections[d["name"]] = d
+        for r in current_detections:
+            self.old_detections.append(r)
 
     @staticmethod
     def _norm(emb: np.ndarray) -> np.ndarray:
@@ -521,11 +528,63 @@ class FRVidPlayer(VideoPlayer):
     # ──────────────────────── Inference Thread ─────────────────────────────
 
     def start_inference(self) -> None:
+        '''Starts inference loop in another thread'''
         with self.inference_lock:
             self.fr_results = []
-            self.broadcast_package = []
         self.inferenceThread = threading.Thread(target=self._loop_inference, daemon=True)
         self.inferenceThread.start()
+
+    def start_detection_broadcast(self) -> Generator[str, None, None]:
+        '''Generator for detection broadcast (for /frResults)'''
+        last_send_time = 0
+        while self.inferenceThread and self.inferenceThread.is_alive():
+            # Cap rate of broadcast to MAX_BROADCAST_FPS
+            now = time.monotonic()
+            if now - last_send_time < 1 / self.fr_settings["max_broadcast_fps"]:
+                time.sleep(0.001)
+                continue
+
+            with self.inference_lock:
+                results = self.fr_results
+            
+            last_send_time = now
+            yield json.dumps({"data": results}) + '\n'
+
+    def cleanup(self, *_args) -> None:
+        '''Sets event to trigger termination of inference and streaming processees'''
+
+        log_info("CLEANING UP...")
+
+        self.end_stream()
+
+        # Join thread briefly to allow clean exitW
+        try:
+            if self.streamThread and self.streamThread.is_alive():
+                self.streamThread.join(timeout=1)
+            if self.inferenceThread and self.inferenceThread.is_alive():
+                self.inferenceThread.join(timeout=1)
+        except Exception:
+            pass
+
+        self._reset_index()
+        self.old_detections: deque[RecentDetection] = deque(maxlen=self.fr_settings["q_max_size"])
+
+        force_exit = bool(_args)
+        if not force_exit:
+            return None
+
+        time.sleep(0.5)
+
+        # Final safety: exit if anything lingers
+        try:
+            sys.exit(0)
+        except SystemExit:
+            # In case sys.exit is swallowed by threads, force exit
+            import os
+            os._exit(0)
+
+        return None
+    
 
     def _loop_inference(self) -> None:
         '''Thread to continuously run inference on latest frames'''
@@ -559,7 +618,7 @@ class FRVidPlayer(VideoPlayer):
                 frame_cnt += 1
                 
                 # Enforced frame skipping
-                skip = self.fr_settings.get("frame_skip", 1)
+                skip = self.fr_settings["frame_skip"]
                 if skip > 1 and frame_cnt % skip != 0:
                     skipped_for_performance += 1
                     continue
@@ -576,7 +635,9 @@ class FRVidPlayer(VideoPlayer):
                 # Write inference results
                 with self.inference_lock:
                     self.fr_results = results
-                    self.broadcast_package = results
+
+                if frame_cnt == 1:
+                    log_info("Successfully performed inference on first RGB frame")
 
                 # Write perf log if it has been perf_interval_s since the last log
                 now = time.monotonic()
@@ -584,7 +645,7 @@ class FRVidPlayer(VideoPlayer):
                     interval = max(now - last_perf_log, 1e-9)
                     fps_infer = infer_calls / interval
                     avg_ms = (infer_time_s_sum / max(infer_calls, 1)) * 1000.0
-                    skip_val = self.fr_settings.get("frame_skip", 1)
+                    skip_val = self.fr_settings["frame_skip"]
                     wait_ratio = skipped_same_frame / max(skipped_same_frame + infer_calls, 1)
                     log_info(f"[PERF] infer:{fps_infer:.1f}fps/{avg_ms:.0f}ms skip:{skip_val} wait:{wait_ratio:.1%}")
                     last_perf_log = now
@@ -595,56 +656,7 @@ class FRVidPlayer(VideoPlayer):
 
             except Exception as e:
                 log_info(f"Inference loop error: {e}")
-
+        
+        # When loop breaks, reset index and state
         self._reset_index()
-        self.active_detections = {}
-
-    def start_detection_broadcast(self) -> Generator[str, None, None]:
-        last_send_time = 0
-        while self.inferenceThread and self.inferenceThread.is_alive():
-            # Cap rate of broadcast to MAX_BROADCAST_FPS
-            now = time.monotonic()
-            if now - last_send_time < 1 / self.fr_settings.get("max_broadcast_fps", 50):
-                time.sleep(0.001)
-                continue
-
-            with self.inference_lock:
-                results = self.broadcast_package
-            
-            last_send_time = now
-            yield json.dumps({"data": results}) + '\n'
-
-    def cleanup(self, *_args) -> None:
-        """Sets event to trigger termination of inference and streaming processees"""
-
-        log_info("CLEANING UP...")
-
-        self.end_stream()
-
-        # Join thread briefly to allow clean exitW
-        try:
-            if self.streamThread and self.streamThread.is_alive():
-                self.streamThread.join(timeout=1)
-            if self.inferenceThread and self.inferenceThread.is_alive():
-                self.inferenceThread.join(timeout=1)
-        except Exception:
-            pass
-
-        self._reset_index()
-        self.active_detections = {}
-
-        force_exit = bool(_args)
-        if not force_exit:
-            return None
-
-        time.sleep(0.5)
-
-        # Final safety: exit if anything lingers
-        try:
-            sys.exit(0)
-        except SystemExit:
-            # In case sys.exit is swallowed by threads, force exit
-            import os
-            os._exit(0)
-
-        return None
+        self.old_detections: deque[RecentDetection] = deque(maxlen=self.fr_settings["q_max_size"])

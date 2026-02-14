@@ -245,7 +245,7 @@ export const delay = (time) => {
 };
 
 export const fetchStreamStatus = async () => {
-    const response = await fetch("/streamStatus");
+    const response = await fetch("/api/streamStatus");
     return response.json();
 };
 

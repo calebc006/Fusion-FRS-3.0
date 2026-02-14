@@ -83,7 +83,7 @@ async function loadReferenceImages({ preserveSelection = true } = {}) {
     const selectedValue = preserveSelection ? nameSelect.value : "";
 
     try {
-        const response = await fetch("/reference_images");
+        const response = await fetch("/api/reference_images");
         if (!response.ok) throw new Error("Failed to fetch reference images");
         imageData = await response.json();
 
@@ -208,7 +208,7 @@ function createImageCard(name, imgPath) {
         deleteBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             const relativePath = imgPath.replace("/data/captures", "");
-            const res = await fetch("/remove_image", {
+            const res = await fetch("/api/remove_image", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json', 

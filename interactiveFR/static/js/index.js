@@ -25,7 +25,7 @@ const endStreamAndReload = async () => {
     }
     isEndingStream = true;
     try {
-        await fetch("/end", { method: "POST" });
+        await fetch("/api/end", { method: "POST" });
     } catch {}
     localStorage.removeItem("namelistPath");
     localStorage.removeItem("streamSrc");
@@ -102,7 +102,7 @@ document.getElementById("init").onsubmit = async (event) => {
     }, 600);
 
     try {
-        const response = await fetch("/start", {
+        const response = await fetch("/api/start", {
             method: "POST",
             body: formData,
         });
@@ -242,7 +242,7 @@ const inputConfigBySelection = {
 
 const fetchCameras = async () => {
     try {
-        const response = await fetch("/listCameras");
+        const response = await fetch("/api/listCameras");
         const cameras = await response.json();
 
         cameraSelect.innerHTML = "";

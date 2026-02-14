@@ -5,7 +5,7 @@ const settings_button = document.getElementById("settings-button");
 const reset_button = document.getElementById("reset-button");
 
 const fetchStreamStatus = async () => {
-    const response = await fetch("/streamStatus");
+    const response = await fetch("/api/streamStatus");
     return response.json();
 };
 
@@ -28,7 +28,7 @@ settings_button?.addEventListener("click", async (event) => {
 reset_button?.addEventListener("click", async (event) => {
     event.preventDefault();
     try {
-        await fetch("/end", { method: "POST" });
+        await fetch("/api/end", { method: "POST" });
     } catch {}
 
     try {
