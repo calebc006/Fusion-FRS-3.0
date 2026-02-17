@@ -7,26 +7,33 @@ import atexit
 from types import SimpleNamespace
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, send_from_directory
+from flask import Flask, Response, render_template, request, redirect, url_for, send_from_directory
 from flask_cors import CORS
+from waitress import serve
 
-from fr import FRVidPlayer, VideoSource
-from utils import log_info
+from lib import FREngine, VideoPlayer, StreamState
+from lib.utils import list_camera_devices, log_info, init_logger
 
 load_dotenv()
 app = Flask(__name__)
 CORS(app) 
 
+init_logger()
 log_info("Starting FR Session")
-fr_instance = FRVidPlayer(
+
+videoplayer = VideoPlayer(
     width=int(os.getenv("WIDTH", "1920")),
     height=int(os.getenv("HEIGHT", "1080")),
     fps=int(os.getenv("FPS", "25")),
+)
+
+fr_instance = FREngine(
+    videoplayer=videoplayer,
     inference_width=int(os.getenv("INFERENCE_WIDTH", "640")),
     inference_height=int(os.getenv("INFERENCE_HEIGHT", "480")),
 )
 
-# Config from environment (can be overridden by argparse)
+# Config from environment 
 config = SimpleNamespace(
     ip=os.getenv("APP_IP", "0.0.0.0"),
     port=int(os.getenv("APP_PORT", "1334")),
@@ -34,65 +41,75 @@ config = SimpleNamespace(
 )
 
 # Ensure fr_instance runs .cleanup() before process termination
-atexit.register(fr_instance.cleanup)
-
+atexit.register(lambda sig, frame: fr_instance.cleanup(force_exit=True))
 
 # ───────────────────────────── API Routes ─────────────────────────────────
 
-@app.route("/api/start", methods=["POST"])
-def start():
-    """API for frontend to start FR"""
+@app.route("/api/start_stream", methods=["POST"])
+def start_stream():
+    """API for frontend to start videoplayer stream"""
+    payload = request.get_json(silent=True)
+    stream_src = payload.get("stream_src")
 
-    if fr_instance.is_started:
+    if videoplayer.is_started():
         return _json({"stream": False, "message": "Stream already started!"})
 
-    stream_src = request.form.get("stream_src")
+    videoplayer.start_stream(stream_src)
 
-    fr_instance.start_stream(stream_src)
+    # Poll the stream thread until it starts (if not assume it failed)
+    for delay in [0, 0.1, 0.2, 0.5, 1]:
+        time.sleep(delay)
+        if videoplayer.streamThread and videoplayer.streamThread.is_alive():
+            break
+        log_info(f"Stream thread not started, checking again in {delay}s...")
 
-    # Give the stream thread a moment to start and check if it's still alive
-    time.sleep(0.3)
-    if not fr_instance.streamThread or not fr_instance.streamThread.is_alive():
-        log_info("Stream thread died immediately after starting")
-        fr_instance.end_stream()
+    if not videoplayer.streamThread or not videoplayer.streamThread.is_alive():
+        log_info("Stream thread couldn't start")
+        fr_instance.cleanup()
         return _json({"stream": False, "message": "Failed to start video stream. Check logs for details."})
+    
+    return _json({"stream": True, "message": "Success!"})
 
+
+@app.route("/api/start_fr", methods=["POST"])
+def start_fr():
+    """For frontend to load FR embeddings and start inference"""
     try:
         fr_instance.load_embeddings()
     except (ValueError, FileNotFoundError) as e:
-        fr_instance.end_stream()
-        return _json({"stream": False, "message": str(e)})
+        fr_instance.cleanup()
+        log_info(f"Couldn't load embeddings, {e}")
+        return _json({"inference": False, "message": "Failed to load embeddings. Check logs for details."})
 
     fr_instance.start_inference()
-    return _json({"stream": True, "message": "Success!"})
+    return _json({"inference": True, "message": "Success!"})
 
 
 @app.route("/api/end", methods=["POST"])
 def end():
     """API for frontend to end FR"""
 
-    if not fr_instance.is_started:
+    if not videoplayer.is_started():
         return _json({"stream": False, "message": "Stream not started!"})
 
-    fr_instance.end_stream()
+    fr_instance.cleanup()
     return _json({"stream": True, "message": "Success!"})
 
 
-@app.route("/api/streamStatus", methods=["GET"])
-def stream_status():
-    """API to check stream state and last error"""
+@app.route("/api/status", methods=["GET"])
+def status():
+    """API to check stream/inference status and last error"""
 
     return _json({
-        "stream_state": fr_instance.stream_state,
-        "last_error": fr_instance.last_error,
+        "stream_state": videoplayer.stream_state,
+        "last_error": videoplayer.last_error,
         "embeddings_loaded": getattr(fr_instance, "embeddings_loaded", False),
         "embeddings_loading": getattr(fr_instance, "embeddings_loading", False),
     })
 
 @app.route("/api/vidFeed", methods=["GET"])
 def video_feed():
-    return Response(fr_instance.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame")
-
+    return Response(videoplayer.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 @app.route("/api/frResults", methods=["GET"])
 def fr_results():
@@ -145,8 +162,8 @@ def submit_settings():
         
         "use_persistor": "use_persistor" in request.form,
         "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
-        "threshold_prev": float(request.form.get("threshold_prev", s["threshold_prev"])),
         "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
+        "threshold_sim": float(request.form.get("threshold_sim", s["threshold_sim"])),
         "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
     }
     fr_instance.adjust_values(new)
@@ -198,9 +215,17 @@ def remove_image():
 @app.route("/api/listCameras", methods=["GET"])
 def list_cameras():
     """API to list available camera devices"""
-    response = jsonify(VideoSource.list_cameras())
+    response = _json(list_camera_devices())
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.route("/api/get_performance", methods=["GET"])
+def get_performance():
+    """API to get backend performance"""
+    if fr_instance.last_perf is not None:
+        return _json(fr_instance.last_perf)
+    return _json({})
 # ───────────────────────────── Pages ──────────────────────────────────────
 
 @app.route("/")
@@ -230,7 +255,8 @@ def serve_data(filename):
 
 # ───────────────────────────── Helpers ────────────────────────────────────
 
-def _json(data, status=200, headers=None):
+def _json(data, status: int | None = 200, headers: dict | None = None) -> Response:
+    '''Wrapper around json.dumps. Takes in data (Python list/dict) and optional status and headers'''
     response = Response(json.dumps(data), status=status, mimetype='application/json')
     if headers:
         for key, value in headers.items():
@@ -274,11 +300,10 @@ if __name__ == "__main__":
         config.env = "production"
 
     # Cleanup upon interruption
-    signal.signal(signal.SIGINT, fr_instance.cleanup)
+    signal.signal(signal.SIGINT, lambda sig, frame: fr_instance.cleanup(force_exit=True))
 
     if config.env == "production":
         try:
-            from waitress import serve
             log_info(f"Production mode on {config.ip}:{config.port}")
             serve(app, host=config.ip, port=config.port)
         except Exception as e:

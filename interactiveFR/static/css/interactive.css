@@ -3,7 +3,19 @@ body {
     overflow: hidden;
 }
 
-.stream-source {
+.bottom-info {
+    position: fixed;
+    bottom: 8px;
+    left: 12px;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 50;
+    pointer-events: none;
+    display: flex;
+    gap: 10px;
+}
+
+/* .stream-source {
     position: fixed;
     bottom: 8px;
     left: 12px;
@@ -12,6 +24,16 @@ body {
     z-index: 50;
     pointer-events: none;
 }
+
+.perf-log {
+    position: fixed;
+    top: 8px;
+    left: 12px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 50;
+    pointer-events: none;
+} */
 
 #video-container {
     position: absolute;

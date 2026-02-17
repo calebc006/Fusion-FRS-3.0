@@ -201,21 +201,20 @@
         />
         <div class="break"></div>
 
-        <label for="threshold_prev">Persistor Threshold</label>
+        <label for="threshold_sim">Minimum Similarity</label>
         <input
           type="number"
           class="persistor-inputs"
-          id="threshold_prev"
-          name="threshold_prev"
-          value="{{ threshold_prev|float|round(2) }}"
+          id="threshold_sim"
+          name="threshold_sim"
+          value="{{ threshold_sim|float|round(2) }}"
           min="0.01"
           max="0.6"
           step="0.01"
         />
         <div class="break"></div>
-        <!-- The lower the stricter; persistor threshold is used to compare faces with previously identified faces (within holding time) -->
 
-        <label for="threshold_iou">IOU Threshold</label>
+        <label for="threshold_iou">Minimum IOU</label>
         <input
           type="number"
           class="persistor-inputs"
@@ -227,7 +226,6 @@
           step="0.01"
         />
         <div class="break"></div>
-        <!-- The higher the stricter; When comparing with previously identified faces, the bounding boxes must overlap with their intersected area at least a fraction of their union area -->
 
         <label for="threshold_lenient_pers">Lenient Threshold</label>
         <input
@@ -240,7 +238,6 @@
           max="0.9"
           step="0.01"
         />
-        <!-- The lower the stricter; This is a safeguard ensuring that faces fulfilling the above 2 criterias are not completely random but bear some recognition to faces in the database -->
       </fieldset>
 
       <input type="submit" class="submit-button" value="Submit" />

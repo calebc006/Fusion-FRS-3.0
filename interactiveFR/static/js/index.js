@@ -1,5 +1,4 @@
 import {
-    fetchStreamStatus,
     waitForEmbeddings,
     waitForStream,
 } from "./utils.js";
@@ -9,9 +8,9 @@ const cameraSelect = document.getElementById("camera_device_select");
 
 window.addEventListener("DOMContentLoaded", async () => {
     try {
-        if (localStorage.getItem("streamSrc") != null) {
-            window.location.href = "/interactive";
-        }
+        // if (localStorage.getItem("streamSrc") != null) {
+        //     window.location.href = "/interactive";
+        // }
     } catch (error) {
         console.log(error);
     }
@@ -52,113 +51,83 @@ const resolveStreamSource = () => {
 
 // ------------ Init form ---------------
 
+
 // Handles form submission (stream url and data file)
 document.getElementById("init").onsubmit = async (event) => {
     event.preventDefault();
 
     const form = event.target;
+    const submitButton = document.getElementById("submit-button");
+
     const streamSrc = resolveStreamSource();
     if (!streamSrc) {
         return;
     }
-
-    const formData = new FormData(form);
-    formData.set("stream_src", streamSrc);
-
-    // Store stream source
     localStorage.setItem("streamSrc", streamSrc);
 
-    const removeSubmitButton = () => {
-        const submitButton = document.getElementById("submit-button");
-        submitButton?.remove();
-    };
-
-    const addSubmitButton = () => {
-        if (document.getElementById("submit-button")) {
-            return;
-        }
-        const newSubmit = document.createElement("input");
-        newSubmit.type = "submit";
-        newSubmit.id = "submit-button";
-        newSubmit.className = "submit-button";
-        newSubmit.value = "Submit";
-        form.appendChild(newSubmit);
-    };
-
-    removeSubmitButton();
-    const loading = createLoadingManager(form);
+    submitButton.style.display = "none";
+    const loading = Loading(form);
     loading.start("Starting stream");
-    let startRequestPending = true;
-    loading.schedule(() => {
-        if (startRequestPending) {
-            loading.start("Loading embeddings");
-        }
-    }, 600);
 
     try {
-        const response = await fetch("/api/start", {
+        // Start stream
+        let response = await fetch("/api/start_stream", {
             method: "POST",
-            body: formData,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({"stream_src": streamSrc}),
         });
-        const data = await response.json();
-        startRequestPending = false;
+        let data = await response.json();
         loading.stop();
 
         if (!data.stream) {
             loading.remove();
-            addSubmitButton();
-
-            alert(data.message || "Failed to start stream.");
+            submitButton.style.display = "block";
+            alert(data.message || "Failed to start stream");
             return;
         }
 
+        // Start FR
         loading.start("Loading embeddings");
-        const embeddingsStatus = await waitForEmbeddings();
-
-        if (!embeddingsStatus.embeddings_loaded) {
+        response = await fetch("/api/start_fr", {
+            method: "POST",
+        });
+        data = await response.json();
+        loading.stop();
+        
+        if (!data.inference) {
             loading.remove();
-            addSubmitButton();
-            alert("Embedding load timed out. Please try again.");
+            submitButton.style.display = "block"
+
+            alert(data.message || "Failed to start FR");
             return;
         }
 
+        // Check that stream has started
         loading.start("Verifying stream");
         const status = await waitForStream();
-
+        
         loading.remove();
-
+        submitButton.style.display = "block"
         if (status.stream_state === "running") {
             window.location.href = "/interactive";
-            return;
+        } else {
+            alert(
+                status.last_error
+                    ? `Stream failed (${status.stream_state}): ${status.last_error}`
+                    : `Stream failed (${status.stream_state}). Please check your source and try again.`,
+            );
         }
 
-        addSubmitButton();
-        alert(
-            status.last_error
-                ? `Stream failed (${status.stream_state}): ${status.last_error}`
-                : `Stream failed (${status.stream_state}). Please check your source and try again.`,
-        );
     } catch {
-        startRequestPending = false;
         loading.remove();
-        addSubmitButton();
+        submitButton.style.display = "block"
 
-        alert(`Error loading stream from ${streamSrc}. Please try again.`);
+        alert(`Error loading stream from ${streamSrc}. Please reset and try again.`);
     }
 };
 
 // Handles loading animation (for dots)
-const createLoadingAnimation = (text, loaderEl) => {
-    let dotCount = 0;
-    const updateLoadingText = () => {
-        dotCount = (dotCount % 3) + 1;
-        loaderEl.innerText = text + ".".repeat(dotCount);
-    };
-
-    return setInterval(updateLoadingText, 500);
-};
-
-const createLoadingManager = (formEl) => {
+const Loading = (formEl) => {
     let loader = formEl.querySelector(".loading-indicator");
     if (!loader) {
         loader = document.createElement("h4");
@@ -167,33 +136,25 @@ const createLoadingManager = (formEl) => {
     }
 
     let intervalId = null;
-    let timerId = null;
 
     const stop = () => {
         if (intervalId) {
             clearInterval(intervalId);
             intervalId = null;
         }
-        if (timerId) {
-            clearTimeout(timerId);
-            timerId = null;
-        }
     };
 
     const start = (text) => {
         stop();
-        intervalId = createLoadingAnimation(text, loader);
-    };
 
-    const schedule = (fn, delayMs) => {
-        if (timerId) {
-            clearTimeout(timerId);
-        }
-        timerId = setTimeout(() => {
-            timerId = null;
-            fn();
-        }, delayMs);
-    };
+        let dotCount = 0;
+        const updateLoadingText = () => {
+            dotCount = (dotCount % 3) + 1;
+            loaderEl.innerText = text + ".".repeat(dotCount);
+        };
+
+        intervalId =  setInterval(updateLoadingText, 500);
+    }
 
     const remove = () => {
         stop();
@@ -204,7 +165,6 @@ const createLoadingManager = (formEl) => {
     return {
         start,
         stop,
-        schedule,
         remove,
     };
 };
@@ -314,9 +274,7 @@ streamSelectElem.addEventListener("change", updateStreamSourceUI);
 updateStreamSourceUI();
 
 // Handle taskbar button to end stream
-document
-    .getElementById("reset-button")
-    .addEventListener("click", async (event) => {
-        event.preventDefault();
-        endStreamAndReload();
-    });
+document.getElementById("reset-button").addEventListener("click", async (e) => {
+    e.preventDefault();
+    endStreamAndReload();
+})

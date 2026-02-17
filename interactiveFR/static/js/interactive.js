@@ -12,7 +12,9 @@ const captureBtn = $("capture-button");
 const referencesPanelBtn = $("references-panel-button");
 const toast = $("toast");
 const videoFeed = $("video-feed");
-let isVideoReady = false;
+const perfDisplay = $("perf-log");
+
+let isVideoReady = false; // becomes true when video container loads
 
 // ───────────────────────────── Init ──────────────────────────────────────
 
@@ -48,6 +50,8 @@ const tryRestartStream = async () => {
 
 window.addEventListener("DOMContentLoaded", async () => {
     try {
+        clearBBoxes($("video-container"));
+
         const status = await fetchStreamStatus();
         if (status.stream_state !== "running") {
             const restart = await tryRestartStream();
@@ -73,7 +77,8 @@ window.addEventListener("DOMContentLoaded", async () => {
             srcLabel.textContent = localStorage.getItem("streamSrc") || "";
         }
 
-        clearBBoxes($("video-container"));
+        setInterval(updatePerfDisplay, 1000)
+
         fetchDetections();
         initReferencesUI({ autoLoad: true });
     } catch {
@@ -106,9 +111,9 @@ const fetchDetections = () => {
                         return;
                     }
 
+                    // Read to buffer in chunks
                     const chunk = decoder.decode(value, { stream: true });
                     buffer += chunk;
-
                     const parts = buffer.split("\n");
 
                     try {
@@ -121,6 +126,7 @@ const fetchDetections = () => {
 
                     buffer = parts[parts.length - 1] || "";
 
+                    // Update BBoxes 
                     if (isVideoReady) {
                         updateBBoxes($("video-container"), data, {
                             showLabels: true,
@@ -129,9 +135,12 @@ const fetchDetections = () => {
                     } else {
                         clearBBoxes($("video-container"));
                     }
+
+                    // Update capture panel
                     updateCapturePanel(data);
 
-                    processStream(); // recursive call
+                    // Recursive call
+                    processStream(); 
                 });
             };
 
@@ -149,6 +158,16 @@ function updateCapturePanel(data) {
     captureBtn.disabled = !hasTarget || !captureInput.value.trim();
     captureHeader?.classList.toggle("is-ready", hasTarget);
 }
+
+async function updatePerfDisplay() {
+    const res = await fetch("/api/get_performance");
+    const data = await res.json();  
+    
+    if ('fps' in data) {
+        perfDisplay.innerHTML = `${data['fps'].toFixed(1)}fps | ${data['avg_ms'].toFixed(0)}ms`
+    }
+}
+
 
 // ───────────────────────────── Capture ───────────────────────────────────
 captureInput.addEventListener(

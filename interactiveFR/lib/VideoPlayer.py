@@ -7,7 +7,7 @@ from typing import Generator
 import numpy as np
 import cv2
 
-from utils import log_info
+from lib.utils import log_info
 
 class RWLock:
     """
@@ -76,39 +76,6 @@ class VideoSource:
         self.width = width
         self.height = height
         self.fps = fps
-    
-    @staticmethod
-    def list_cameras() -> list[str]:
-        '''
-        List available camera device names on the system.
-        Returns a list of device name strings.
-        '''
-        if sys.platform.startswith("win"):
-            try:
-                result = subprocess.run(
-                    ["ffmpeg", "-f", "dshow", "-list_devices", "true", "-i", "dummy"],
-                    capture_output=True, text=True, timeout=5
-                )
-                lines = result.stderr.split('\n')
-                video_devices = []
-                for line in lines:
-                    if '(video)' in line and '"' in line:
-                        start = line.find('"') + 1
-                        end = line.find('"', start)
-                        if start > 0 and end > start:
-                            name = line[start:end]
-                            if not name.startswith('@'):
-                                video_devices.append(name)
-                return video_devices
-            except Exception as e:
-                log_info(f"Error listing cameras: {e}")
-                return []
-        else:
-            # Linux/macOS: list /dev/video* devices
-            import glob
-            devices = sorted(glob.glob("/dev/video*"))
-            log_info(f"Detected {len(devices)} camera(s): {devices}")
-            return devices
 
     def build_ffmpeg_command(self, src: str) -> list[str]:
         src = (src or "").strip()
@@ -227,12 +194,11 @@ class VideoPlayer:
     Class for streaming video from ffmpeg
     """
 
-    def __init__(self, width, height, fps) -> None:
+    def __init__(self, width, height, fps, jpg_quality=75) -> None:
         # For modifiables
         self.vid_lock = RWLock()  # RWLock for concurrent read access
-        self.frame_bytes = b"" 
+        self.current_frame: np.ndarray | None = None # ndarray to store the current frame
         self.frame_id = 0 # Counter to track new frames
-        self.perf_logging = False
         self.ffmpeg_process = None
         self.streamThread = None
 
@@ -245,6 +211,7 @@ class VideoPlayer:
         self.height = height
         self.frame_size = self.width * self.height * 3
         self.fps = fps
+        self.jpg_quality = jpg_quality
         
         self.stream_state = StreamState.IDLE
         self.last_error = None
@@ -253,7 +220,6 @@ class VideoPlayer:
 
     # -------- Public API ---------
 
-    @property
     def is_started(self) -> bool:
         return self.stream_state == StreamState.RUNNING
     
@@ -290,7 +256,10 @@ class VideoPlayer:
 
         log_info("Ending stream...")
         self._shutdown_stream()
-        self.stream_state = StreamState.IDLE
+
+        self.current_frame = None 
+        self.frame_id = 0 
+        self.last_error = None
         
     def start_broadcast(self) -> Generator[bytes, any, any]:
         """
@@ -302,23 +271,20 @@ class VideoPlayer:
         while self.streamThread is not None and self.streamThread.is_alive():
             with self.vid_lock.read_lock():
                 current_frame_id = self.frame_id
-                frame_bytes = self.frame_bytes
+                frame = self.current_frame
 
             if current_frame_id <= last_frame_id:
-                time.sleep(0.01)
+                time.sleep(0.005)
                 continue
             last_frame_id = current_frame_id
 
-            if not frame_bytes or len(frame_bytes) != self.frame_size:
-                time.sleep(0.01)
+            if frame is None or frame.shape != (self.height, self.width, 3):
+                time.sleep(0.005)
                 continue
 
-            # Reshape, convert to JPEG before streaming
-            frame = np.frombuffer(frame_bytes, np.uint8).reshape(
-                (self.height, self.width, 3)
-            )
+            # Convert to JPEG before streaming
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            _, buffer = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            _, buffer = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, self.jpg_quality])
 
             yield (
                 b"--frame\r\n"
@@ -396,11 +362,19 @@ class VideoPlayer:
                     del buffer_bytes[:len(buffer_bytes) - max_buffer]
 
                 while len(buffer_bytes) >= self.frame_size:
+                    # Read latest frame bytes from buffer
                     frame_bytes = buffer_bytes[:self.frame_size]
+
+                    # Remove latest frame from buffer
                     del buffer_bytes[:self.frame_size]
 
+                    # Reshape raw frame bytes into numpy array
+                    frame = np.frombuffer(frame_bytes, np.uint8).reshape(
+                        (self.height, self.width, 3)
+                    )
+
                     with self.vid_lock.write_lock():
-                        self.frame_bytes = frame_bytes
+                        self.current_frame = frame
                         self.frame_id += 1
 
                     frames_processed += 1
@@ -410,7 +384,6 @@ class VideoPlayer:
         except Exception as e:
             log_info(f"Unhandled error in FFmpeg stream thread: {e}")
             self.stream_state = StreamState.FAILED
-
             self.end_event.set()
         
         if self.stream_state != StreamState.FAILED:
@@ -420,7 +393,7 @@ class VideoPlayer:
         return
 
     def _shutdown_stream(self):
-        """Ends streaming loop, safely stops ffmpeg process and resets state"""
+        """Ends streaming loop, safely stops ffmpeg process and resets streamstate"""
 
         if self.stream_state not in (StreamState.IDLE, StreamState.FAILED):
             self.stream_state = StreamState.STOPPING
@@ -432,6 +405,8 @@ class VideoPlayer:
         if self.ffmpeg_process and self.ffmpeg_process.poll() is None:
             self.ffmpeg_process.terminate()
             try:
-                self.ffmpeg_process.wait(timeout=1)
+                self.ffmpeg_process.wait(timeout=0.5)
             except subprocess.TimeoutExpired:
                 self.ffmpeg_process.kill()
+
+        self.stream_state = StreamState.IDLE

@@ -1,6 +1,6 @@
 # InteractiveFR
 
-![Project Logo](static/images/fusionlogo.png)
+![Project Logo](public/images/fusionlogo.png)
 
 ---
 
@@ -73,6 +73,8 @@ Refer to .env.example
 APP_IP=0.0.0.0
 APP_PORT=1334
 APP_ENV=production # "production" or "development"
+
+STREAM_JPG_QUALITY=90
 
 # Input resolution for inference 
 INFERENCE_WIDTH=640
