@@ -15,12 +15,14 @@
 - [x] Convert buffer to `np.ndarray` before storing in `VideoPlayer`
 - [x] Factor out Voyager index to separate `EmbeddingIndex` class from `FREngine`
 - [x] Improve backend perf-logging, expose to frontend
+- [ ] Add settings submit toast, capture on "ENTER"
+- [ ] Investigate capture input getting blocked
 - [ ] Reliability and performance testing
 - [ ] Update docs
 
 ### SimpliFRy
-- [ ] Reuse similar backend to InteractiveFR
 - [ ] Port over QOL UI changes (perf-logging, settings), refactor UI
+- [ ] Reuse similar backend to InteractiveFR
 - [ ] Reliability and performance testing
 - [ ] Update docs
 
