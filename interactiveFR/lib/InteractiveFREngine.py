@@ -1,5 +1,5 @@
-import os
 import sys
+import os
 import threading
 import logging
 import time
@@ -187,7 +187,7 @@ class FREngine:
 
         # Capture 
         self.capture_lock = threading.Lock()
-        self.latest_frame: np.ndarray | None = None
+        self.latest_target_frame: np.ndarray | None = None
         self.latest_target_detection: dict | None = None
         
         # Other state
@@ -535,8 +535,8 @@ class FREngine:
 
         if crop is None:
             with self.capture_lock:
-                detection, frame = self.latest_target_detection, self.latest_frame
-            if not detection or frame is None:
+                detection, frame = self.latest_target_detection, self.latest_target_frame
+            if detection is None or frame is None:
                 return {"ok": False, "message": "No target face available."}
             crop = self._crop_image(np.asarray(frame), detection["bbox"]) # convert back from memoryview to np array first!
 
@@ -555,6 +555,12 @@ class FREngine:
 
             # Recompute cached embedding for that person
             updated_emb = self._recompute_cached_embedding(data_dir)
+            
+            # Check if no face detected!
+            if updated_emb is None:
+                log_info(f"Capture failed for {safe_name}. No face detected!")
+                os.remove(img_path)
+                return {"ok": False, "message": "No face detected!"}
             
             # Update vector index
             self.embedding_index.add_item(safe_name, updated_emb)
@@ -619,7 +625,7 @@ class FREngine:
     def _update_capture_target(self, frame: np.ndarray, embeddings: list, labels: list[str], bboxes: list) -> int | None:
         '''
         Chooses the unknown detection with greatest area as target. 
-        Updates latest_frame and latest_target_detection for use by capture_unknown
+        Updates latest_target_frame and latest_target_detection for use by capture_unknown
         Returns target_idx (or None if no unknown detections are found)
         '''
         target_idx = None
@@ -632,15 +638,14 @@ class FREngine:
             if area > max_area:
                 max_area, target_idx = area, i
 
-        with self.capture_lock:
-            self.latest_frame = memoryview(frame)
-            self.latest_target_detection = (
-                {
+        if target_idx is not None and target_idx < len(embeddings):
+            with self.capture_lock:
+                self.latest_target_frame = memoryview(frame)
+                self.latest_target_detection = {
                     "bbox": bboxes[target_idx], 
                     "embedding": np.asarray(embeddings[target_idx], dtype=np.float32)
                 }
-                if target_idx is not None and target_idx < len(embeddings) else None
-            )
+
         return target_idx
     
     def _load_captures(self) -> int:
@@ -731,7 +736,7 @@ class FREngine:
                 log_info(f"Embedding cache save failed: {folder} ({e})")
             return emb
 
-        log_info(f"Embedding cache save failed unexpectedly.")
+        log_info(f"Embedding cache save failed: no embeddings found in {folder}!")
         return None
 
     @staticmethod

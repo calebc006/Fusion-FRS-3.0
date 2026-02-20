@@ -287,6 +287,7 @@ export const waitForEmbeddings = async ({
     };
 };
 
+// type = "info", "error", "success"
 export const showToast = (toast, message, type="info", duration_ms=3000) => {
     if (!toast) return;
     toast.textContent = message;

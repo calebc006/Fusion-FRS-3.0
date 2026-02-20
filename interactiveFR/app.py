@@ -145,29 +145,33 @@ def confirm_capture():
 
 @app.route("/api/submit_settings", methods=["POST"])
 def submit_settings():
-    s = fr_instance.fr_settings
-    new = {
-        "threshold": float(request.form.get("threshold", s["threshold"])),
-        "holding_time": float(request.form.get("holding_time", s["holding_time"])),
-        "max_detections": int(request.form.get("max_detections", s["max_detections"])),
-        "perf_logging": "perf_logging" in request.form,
-        "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
-        "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
-        "video_width": int(request.form.get("video_width", s["video_width"])),
-        "video_height": int(request.form.get("video_height", s["video_height"])),
+    try:
+        s = fr_instance.fr_settings
+        new = {
+            "threshold": float(request.form.get("threshold", s["threshold"])),
+            "holding_time": float(request.form.get("holding_time", s["holding_time"])),
+            "max_detections": int(request.form.get("max_detections", s["max_detections"])),
+            "perf_logging": "perf_logging" in request.form,
+            "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
+            "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
+            "video_width": int(request.form.get("video_width", s["video_width"])),
+            "video_height": int(request.form.get("video_height", s["video_height"])),
 
-        "use_differentiator": "use_differentiator" in request.form,
-        "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
-        "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
-        
-        "use_persistor": "use_persistor" in request.form,
-        "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
-        "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
-        "threshold_sim": float(request.form.get("threshold_sim", s["threshold_sim"])),
-        "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
-    }
-    fr_instance.adjust_values(new)
-    return redirect(url_for('settings'))
+            "use_differentiator": bool(request.form.get("use_differentiator", s["use_differentiator"])),
+            "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
+            "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
+            
+            "use_persistor": bool(request.form.get("use_persistor", s["use_persistor"])),
+            "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
+            "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
+            "threshold_sim": float(request.form.get("threshold_sim", s["threshold_sim"])),
+            "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
+        }
+
+        fr_instance.adjust_values(new)
+        return _json({"message":"success"}, 200)
+    except:
+        return _json({"message":"Failed to update settings"}, 500)
 
 
 @app.route("/api/get_settings", methods=["GET"])

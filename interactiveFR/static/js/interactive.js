@@ -155,7 +155,7 @@ const fetchDetections = () => {
 function updateCapturePanel(data) {
     hasTarget = data.some((d) => d.is_target);
     captureTarget.textContent = hasTarget ? "Ready" : "None";
-    captureBtn.disabled = !hasTarget || !captureInput.value.trim();
+    captureBtn.disabled = !hasTarget;
     captureHeader?.classList.toggle("is-ready", hasTarget);
 }
 
@@ -170,14 +170,9 @@ async function updatePerfDisplay() {
 
 
 // ───────────────────────────── Capture ───────────────────────────────────
-captureInput.addEventListener(
-    "input",
-    () => (captureBtn.disabled = !hasTarget || !captureInput.value.trim()),
-);
 
-
-
-captureBtn.addEventListener("click", async () => {
+const handleCapture = async () => {
+    captureBtn.disabled = true;    
     const name = captureInput.value.trim();
     if (!name) return showToast(toast, "Enter a name first.", "error");
 
@@ -187,7 +182,6 @@ captureBtn.addEventListener("click", async () => {
     .replace(/\s+/g, "_")             // Replace internal spaces with underscores
     .toUpperCase();                   // Convert to uppercase
     
-    captureBtn.disabled = true;    
     showToast(toast, "Capturing...", "info");
 
     try {
@@ -213,8 +207,8 @@ captureBtn.addEventListener("click", async () => {
             }
             else {
                 // add back capture btn and exit
-                showToast(toast, "Canceled capture", "success");
-                captureBtn.disabled = !hasTarget || !captureInput.value.trim(); 
+                showToast(toast, "Canceled capture", "info");
+                captureBtn.disabled = !hasTarget; 
                 return;
             }
         }
@@ -231,7 +225,17 @@ captureBtn.addEventListener("click", async () => {
     } catch {
         showToast(toast, "Capture failed unexpectedly.", "error");
     } finally {
-        captureBtn.disabled = !hasTarget || !captureInput.value.trim();
+        captureBtn.disabled = !hasTarget;
+    }
+}
+
+captureBtn.addEventListener("click", e => {
+    e.preventDefault();
+    handleCapture();
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        handleCapture();
     }
 });
 

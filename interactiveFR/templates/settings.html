@@ -11,7 +11,16 @@
   </head>
   <body>
     <h1 class="title">Facial Recognition Settings</h1>
-    <form class="form" action="/api/submit_settings" method="POST">
+
+    <!-- Toast -->
+    <div
+      id="toast"
+      class="toast"
+      role="status"
+      aria-live="polite"
+    ></div>
+
+    <form id="settings-form" class="form">
       <fieldset class="form-section">
         <legend>Default Parameters</legend>
 
@@ -240,7 +249,7 @@
         />
       </fieldset>
 
-      <input type="submit" class="submit-button" value="Submit" />
+      <input type="submit" class="submit-button" id="submit-button" value="Submit" />
     </form>
 
     <!-- Bottom Taskbar -->
@@ -250,7 +259,7 @@
       </div>
     </div>
 
-    <script src="../static/js/settings.js"></script>
-    <script src="../static/js/taskbar.js"></script>
+    <script type="module" src="../static/js/settings.js"></script>
+    <script type="module" src="../static/js/taskbar.js"></script>
   </body>
 </html>

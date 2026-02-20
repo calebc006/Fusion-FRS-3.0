@@ -1,8 +1,10 @@
 # FRS 3 Changelog
 
 ## v3.0 (Released 110226)
-- These are the changes from v2.2... 
-- Used for 29th SMEAC and 2026 SSPP @ JPJC
+- Massively improved back-end performance and reliability via code optimizations. Eliminated previous issues of lag, crashing and instability.
+- Added optional input configuration for users: description, table number (for new seating feature), sorting index (for priority of display), filter tag(s).
+- Introduced InteractiveFR, using a similar backend as SimpliFRy.
+- Deployed for 29th SMEAC @ SAFTI MI and 2026 SSPP @ JPJC.
 
 ## v3.1 (CAA 170226)
 ### InteractiveFR
@@ -11,18 +13,16 @@
 - [x] Switched to non-square model input (640x480 default) 
 - [x] Removed hold_time from the backend. Switched to using a queue with max-length for old_detections.
 - [x] Catch and warn user when capturing with an existing name. Confirmation required via separate API path.
-- [x] UI changes: Enlarged video feed, improved capture/remove image toasts, changed bbox labels (only display for target and identified faces).
+- [x] UI changes: Enlarged video feed, improved capture/remove image toasts, changed bbox labels (only display for target and identified faces), added settings submit toast, capture on "ENTER"
 - [x] Convert buffer to `np.ndarray` before storing in `VideoPlayer`
 - [x] Factor out Voyager index to separate `EmbeddingIndex` class from `FREngine`
 - [x] Improve backend perf-logging, expose to frontend
-- [ ] Add settings submit toast, capture on "ENTER"
-- [ ] Investigate capture input getting blocked
 - [ ] Reliability and performance testing
-- [ ] Update docs
+- [ ] Update docs and developer guide
 
 ### SimpliFRy
-- [ ] Port over QOL UI changes (perf-logging, settings), refactor UI
 - [ ] Reuse similar backend to InteractiveFR
+- [ ] Port over QOL UI changes (perf-logging, settings), refactor UI
 - [ ] Reliability and performance testing
 - [ ] Update docs
 
@@ -33,3 +33,4 @@
 
 ## Future
 - [ ] Lazy loading for reference images
+- [ ] Implement TLS (https) for safer multi-location implementation
