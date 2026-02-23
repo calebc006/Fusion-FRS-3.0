@@ -7,13 +7,15 @@ from typing import Generator
 import numpy as np
 import cv2
 
-from fr.logger import log_info
+from lib.utils import log_info
 
 class RWLock:
     """
     Read-Write Lock: allows multiple simultaneous readers OR one exclusive writer.
     Readers don't block each other, only writers need exclusive access.
+    Used for protecting frame_bytes and frame_id, allowing multiple readers (broadcast and inference)
     """
+
     def __init__(self):
         self._read_ready = threading.Condition(threading.Lock())
         self._readers = 0
@@ -58,14 +60,12 @@ class RWLock:
         finally:
             self.release_write()
 
-
 class StreamState:
     IDLE = "idle"
     STARTING = "starting"
     RUNNING = "running"
     STOPPING = "stopping"
     FAILED = "failed"
-
 
 class VideoSource:
     '''
@@ -76,39 +76,6 @@ class VideoSource:
         self.width = width
         self.height = height
         self.fps = fps
-    
-    @staticmethod
-    def list_cameras() -> list[str]:
-        '''
-        List available camera device names on the system.
-        Returns a list of device name strings.
-        '''
-        if sys.platform.startswith("win"):
-            try:
-                result = subprocess.run(
-                    ["ffmpeg", "-f", "dshow", "-list_devices", "true", "-i", "dummy"],
-                    capture_output=True, text=True, timeout=5
-                )
-                lines = result.stderr.split('\n')
-                video_devices = []
-                for line in lines:
-                    if '(video)' in line and '"' in line:
-                        start = line.find('"') + 1
-                        end = line.find('"', start)
-                        if start > 0 and end > start:
-                            name = line[start:end]
-                            if not name.startswith('@'):
-                                video_devices.append(name)
-                return video_devices
-            except Exception as e:
-                log_info(f"Error listing cameras: {e}")
-                return []
-        else:
-            # Linux/macOS: list /dev/video* devices
-            import glob
-            devices = sorted(glob.glob("/dev/video*"))
-            log_info(f"Detected {len(devices)} camera(s): {devices}")
-            return devices
 
     def build_ffmpeg_command(self, src: str) -> list[str]:
         src = (src or "").strip()
@@ -188,6 +155,7 @@ class VideoSource:
                     "-buffer_size", "64k",
 
                     # Output to stdout
+                    "-loglevel", "error",
                     "pipe:1",
                 ]
             else:
@@ -196,7 +164,7 @@ class VideoSource:
                     "ffmpeg",
 
                     # Low-latency v4l2 settings
-                    "-f", "v4l2",
+                    "-f", "dshow",
                     "-fflags", "nobuffer",
                     "-flags", "low_delay",
                     "-probesize", "32",
@@ -217,209 +185,44 @@ class VideoSource:
                     "-buffer_size", "64k",
 
                     # Output to stdout
+                    "-loglevel", "error",
                     "pipe:1",
                 ]
-
 
 class VideoPlayer:
     """
     Class for streaming video from ffmpeg
     """
 
-    def __init__(self) -> None:
-        """Initialises the class"""
-
+    def __init__(self, width, height, fps, jpg_quality=75) -> None:
         # For modifiables
         self.vid_lock = RWLock()  # RWLock for concurrent read access
-        self.frame_bytes = b"" 
+        self.current_frame: np.ndarray | None = None # ndarray to store the current frame
         self.frame_id = 0 # Counter to track new frames
-        self.perf_logging = False
         self.ffmpeg_process = None
         self.streamThread = None
 
         # Thread event
         self.end_event = threading.Event()
 
-        # Set input resolution and framerate of video (ffmpeg will convert source to this)
-        self.width = 1280
-        self.height = 720
+        # Set resolution and framerate that ffmpeg will convert video source to
+        # This is the resolution and framerate that will be broadcast
+        self.width = width
+        self.height = height
         self.frame_size = self.width * self.height * 3
-        self.fps = 25
+        self.fps = fps
+        self.jpg_quality = jpg_quality
         
         self.stream_state = StreamState.IDLE
         self.last_error = None
 
         log_info("Video Player initialised!")
 
-    @property
+    # -------- Public API ---------
+
     def is_started(self) -> bool:
         return self.stream_state == StreamState.RUNNING
-
-    def _set_stream_state(self, state: str, error: str | None = None) -> None:
-        self.stream_state = state
-        if error is not None:
-            self.last_error = error
-
-    def _stop_ffmpeg(self) -> None:
-        """Terminate ffmpeg process safely and close pipes."""
-        try:
-            if self.ffmpeg_process and self.ffmpeg_process.poll() is None:
-                self.ffmpeg_process.terminate()
-                try:
-                    self.ffmpeg_process.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    self.ffmpeg_process.kill()
-            if self.ffmpeg_process:
-                if self.ffmpeg_process.stdout:
-                    try:
-                        self.ffmpeg_process.stdout.close()
-                    except Exception:
-                        pass
-                if self.ffmpeg_process.stderr:
-                    try:
-                        self.ffmpeg_process.stderr.close()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-    def _shutdown_stream(self, reason: str, join_stream: bool = True) -> None:
-        if self.stream_state not in (StreamState.IDLE, StreamState.FAILED):
-            self._set_stream_state(StreamState.STOPPING)
-
-        self.end_event.set()
-        self._stop_ffmpeg()
-
-        if join_stream and self.streamThread and self.streamThread.is_alive():
-            if threading.current_thread() != self.streamThread:
-                self.streamThread.join(timeout=1)
-
-        self.streamThread = None
-        self.ffmpeg_process = None
-
-        if reason == "end_stream":
-            self._set_stream_state(StreamState.IDLE)
-        elif self.stream_state != StreamState.FAILED:
-            self._set_stream_state(StreamState.IDLE)
-        return None
-
-    def _drain_stderr(self, process: subprocess.Popen) -> None:
-        """Drain stderr in background to prevent pipe buffer from blocking FFmpeg.
-        Only logs lines that indicate actual errors or warnings."""
-        _ERROR_KEYWORDS = ("error", "fatal", "failed", "invalid", "unable", "cannot", "no such", "warning")
-        try:
-            for line in iter(process.stderr.readline, b''):
-                decoded = line.decode('utf-8', errors='ignore').rstrip()
-                if decoded and any(kw in decoded.lower() for kw in _ERROR_KEYWORDS):
-                    log_info(f"FFmpeg stderr: {decoded}")
-        except Exception:
-            pass
-
-    def _handleFFmpegStream(self, ffmpeg_command: list) -> None:
-        """
-        Opens ffmpeg subprocess and processes the frame to bytes
-        
-        Arguments
-        - ffmpeg_command: fully built ffmpeg command list
-        """
-
-        log_info(f"FFmpeg command: {ffmpeg_command}")
-
-        ffmpeg_process = None
-
-        # Main try/except 
-        try:
-            ffmpeg_process = subprocess.Popen(
-                ffmpeg_command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                bufsize=0  # Unbuffered
-            )
-            log_info("FFmpeg process started")
-
-            # Keep a handle so we can stop it from other methods
-            self.ffmpeg_process = ffmpeg_process
-
-            # Drain stderr in background to prevent pipe buffer from blocking FFmpeg
-            stderr_thread = threading.Thread(target=self._drain_stderr, args=(ffmpeg_process,), daemon=True)
-            stderr_thread.start()
-
-            # Give ffmpeg a brief moment to start and check if it failed immediately
-            time.sleep(0.1)
-
-            if ffmpeg_process.poll() is not None:
-                # Process has already terminated (stderr drain thread will log details)
-                log_info("FFmpeg process terminated immediately")
-                self._set_stream_state(StreamState.FAILED, "FFmpeg process terminated immediately")
-                self.end_event.set()
-                return
-
-            self._set_stream_state(StreamState.RUNNING)
-            log_info("FFmpeg process is running, starting frame processing...")
-
-            buffer_bytes = bytearray()
-            frames_processed = 0
-
-            # MAIN READ LOOP
-            while not self.end_event.is_set():
-                # Check if process has terminated
-                if ffmpeg_process.poll() is not None:
-                    log_info(f"FFmpeg process terminated unexpectedly. Processed {frames_processed} frames.")
-                    self._set_stream_state(StreamState.FAILED, "FFmpeg process terminated unexpectedly")
-                    self.end_event.set()
-                    break
-
-                # Read chunk of data
-                try:
-                    chunk = ffmpeg_process.stdout.read(65536)  # 64KB chunks for better throughput
-                except Exception as e:
-                    log_info(f"Error reading from stdout: {e}")
-                    self._set_stream_state(StreamState.FAILED, "Error reading from FFmpeg stdout")
-                    self.end_event.set()
-                    break
-
-                if not chunk:
-                    # Empty chunk - could mean EOF or just no data yet
-                    if ffmpeg_process.poll() is not None:
-                        log_info(f"FFmpeg process terminated. Processed {frames_processed} frames.")
-                        self._set_stream_state(StreamState.FAILED, "FFmpeg process terminated")
-                        self.end_event.set()
-                        break
-                    else:
-                        # Process alive but no data yet; minimal sleep to avoid busy loop
-                        time.sleep(0.01)
-                    continue
-
-                # We got data!
-                buffer_bytes.extend(chunk)
-
-                # Cap buffer to prevent unbounded memory growth (~10 frames max)
-                max_buffer = self.frame_size * 10
-                if len(buffer_bytes) > max_buffer:
-                    del buffer_bytes[:len(buffer_bytes) - max_buffer]
-
-                while len(buffer_bytes) >= self.frame_size:
-                    frame_bytes = buffer_bytes[:self.frame_size]
-                    del buffer_bytes[:self.frame_size]
-
-                    with self.vid_lock.write_lock():
-                        self.frame_bytes = frame_bytes
-                        self.frame_id += 1
-
-                    frames_processed += 1
-                    if frames_processed == 1:
-                        log_info("Successfully processed first RGB frame from FFmpeg stream")
-        
-        except Exception as e:
-            log_info(f"Unhandled error in FFmpeg stream thread: {e}")
-            self._set_stream_state(StreamState.FAILED, f"Unhandled FFmpeg thread error: {e}")
-            self.end_event.set()
-        
-        # Always run shutdown
-        finally:
-            self._shutdown_stream("thread_exit", join_stream=False)
-        return
-
+    
     def start_stream(self, stream_src: str) -> None:
         """
         Starts ffmpeg video stream in a separate thread
@@ -438,30 +241,29 @@ class VideoPlayer:
         if not ffmpeg_command:
             log_info("Failed to build FFmpeg command; stream not started")
             self.end_event.set()
-            self._set_stream_state(StreamState.FAILED, "Failed to build FFmpeg command")
+            self.stream_state = StreamState.FAILED
             return None
 
         self.end_event = threading.Event()
         self.last_error = None
-        self._set_stream_state(StreamState.STARTING)
-        self.streamThread = threading.Thread(target=self._handleFFmpegStream, args=(ffmpeg_command,))
-        self.streamThread.daemon = True
+        self.stream_state = StreamState.STARTING
+        self.streamThread = threading.Thread(target=self._handleFFmpegStream, args=(ffmpeg_command,), daemon=True)
         self.streamThread.start()
         log_info(f"Stream thread started. Thread alive: {self.streamThread.is_alive()}")
-
-        return None
     
     def end_stream(self) -> None:
         """Ends ffmpeg video stream"""
+
         log_info("Ending stream...")
-        self._shutdown_stream("end_stream", join_stream=True)
+        self._shutdown_stream()
+
+        self.current_frame = None 
+        self.frame_id = 0 
+        self.last_error = None
         
     def start_broadcast(self) -> Generator[bytes, any, any]:
         """
-        Broadcasts ffmpeg video stream
-
-        Returns
-        - Generator yielding video frames proccessed from ffmpeg
+        Generator yielding video frames proccessed from ffmpeg, for broadcast 
         """
 
         last_frame_id = 0
@@ -469,25 +271,142 @@ class VideoPlayer:
         while self.streamThread is not None and self.streamThread.is_alive():
             with self.vid_lock.read_lock():
                 current_frame_id = self.frame_id
-                frame_bytes = self.frame_bytes
+                frame = self.current_frame
 
             if current_frame_id <= last_frame_id:
-                time.sleep(0.01)
+                time.sleep(0.005)
                 continue
             last_frame_id = current_frame_id
 
-            if not frame_bytes or len(frame_bytes) != self.frame_size:
-                time.sleep(0.01)
+            if frame is None or frame.shape != (self.height, self.width, 3):
+                time.sleep(0.005)
                 continue
 
-            # Reshape, convert to JPEG before streaming
-            frame = np.frombuffer(frame_bytes, np.uint8).reshape(
-                (self.height, self.width, 3)
-            )
+            # Convert to JPEG before streaming
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            _, buffer = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            _, buffer = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, self.jpg_quality])
 
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
             )
+
+    # -------- Internal Methods ---------
+
+    def _handleFFmpegStream(self, ffmpeg_command: list) -> None:
+        """
+        Thread to open ffmpeg subprocess and processes the frame to bytes
+        
+        Arguments
+        - ffmpeg_command: FFmpeg command in list form for streaming to RGB bytes.
+        """
+
+        # log_info(f"FFmpeg command: {ffmpeg_command}")
+        ffmpeg_process = None
+
+        # Main try/except 
+        try:
+            ffmpeg_process = subprocess.Popen(
+                ffmpeg_command,
+                stdout=subprocess.PIPE,
+                stderr=sys.stderr,
+                bufsize=0  # Unbuffered
+            )
+            log_info("FFmpeg process started")
+
+            # Keep a handle so we can stop it from other methods
+            self.ffmpeg_process = ffmpeg_process
+
+            # Give ffmpeg a brief moment to start and check if it failed immediately
+            time.sleep(0.1)
+
+            if ffmpeg_process.poll() is not None:
+                # Process has already terminated (stderr drain thread will log details)
+                log_info("FFmpeg process terminated immediately")
+                self.stream_state = StreamState.FAILED
+                self.end_event.set()
+                return
+
+            self.stream_state = StreamState.RUNNING
+            buffer_bytes = bytearray()
+            frames_processed = 0
+
+            # MAIN READ LOOP
+            while not self.end_event.is_set():
+                # Check if process has terminated
+                if ffmpeg_process.poll() is not None:
+                    log_info(f"FFmpeg process terminated unexpectedly. Processed {frames_processed} frames.")
+                    self.stream_state = StreamState.FAILED
+                    self.end_event.set()
+                    break
+
+                # Read chunk of data
+                try:
+                    chunk = ffmpeg_process.stdout.read(65536)  # 64KB chunks for better throughput
+                except Exception as e:
+                    log_info(f"Error reading from stdout: {e}")
+                    self.stream_state = StreamState.FAILED
+                    self.end_event.set()
+                    break
+
+                # If no data yet, wait first
+                if not chunk:
+                    continue                    
+
+                # We got data!
+                buffer_bytes.extend(chunk)
+
+                # Cap buffer to prevent unbounded memory growth (~10 frames max)
+                max_buffer = self.frame_size * 10
+                if len(buffer_bytes) > max_buffer:
+                    del buffer_bytes[:len(buffer_bytes) - max_buffer]
+
+                while len(buffer_bytes) >= self.frame_size:
+                    # Read latest frame bytes from buffer
+                    frame_bytes = buffer_bytes[:self.frame_size]
+
+                    # Remove latest frame from buffer
+                    del buffer_bytes[:self.frame_size]
+
+                    # Reshape raw frame bytes into numpy array
+                    frame = np.frombuffer(frame_bytes, np.uint8).reshape(
+                        (self.height, self.width, 3)
+                    )
+
+                    with self.vid_lock.write_lock():
+                        self.current_frame = frame
+                        self.frame_id += 1
+
+                    frames_processed += 1
+                    if frames_processed == 1:
+                        log_info("Successfully processed first RGB frame from FFmpeg stream")
+        
+        except Exception as e:
+            log_info(f"Unhandled error in FFmpeg stream thread: {e}")
+            self.stream_state = StreamState.FAILED
+            self.end_event.set()
+        
+        if self.stream_state != StreamState.FAILED:
+            log_info(f"Stream ended peacefully")
+            self.stream_state = StreamState.IDLE
+
+        return
+
+    def _shutdown_stream(self):
+        """Ends streaming loop, safely stops ffmpeg process and resets streamstate"""
+
+        if self.stream_state not in (StreamState.IDLE, StreamState.FAILED):
+            self.stream_state = StreamState.STOPPING
+
+        # Kill the read loop
+        self.end_event.set()
+    
+        # If ffmpeg_process is still alive: terminate, wait, kill
+        if self.ffmpeg_process and self.ffmpeg_process.poll() is None:
+            self.ffmpeg_process.terminate()
+            try:
+                self.ffmpeg_process.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                self.ffmpeg_process.kill()
+
+        self.stream_state = StreamState.IDLE

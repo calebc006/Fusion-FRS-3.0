@@ -9,109 +9,229 @@ from types import SimpleNamespace
 from dotenv import load_dotenv
 from flask import Flask, Response, render_template, request, redirect, url_for, send_from_directory
 from flask_cors import CORS
+from waitress import serve
 
-from fr import FRVidPlayer
-from utils import log_info
+from lib import FREngine, VideoPlayer, StreamState
+from lib.utils import list_camera_devices, log_info, init_logger
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app)
+CORS(app) 
 
+init_logger()
 log_info("Starting FR Session")
 fr = FRVidPlayer()
 
-# Config from environment (can be overridden by argparse)
-config = SimpleNamespace(
-    ip=os.getenv("APP_IP", "0.0.0.0"),
-    port=int(os.getenv("APP_PORT", "1333")),
-    video=os.getenv("APP_VIDEO", "true").lower() == "true",
-    env=os.getenv("APP_ENV", "development").lower(),
+videoplayer = VideoPlayer(
+    width=int(os.getenv("WIDTH", "1920")),
+    height=int(os.getenv("HEIGHT", "1080")),
+    fps=int(os.getenv("FPS", "25")),
 )
 
-atexit.register(fr.cleanup)
+fr_instance = FREngine(
+    videoplayer=videoplayer,
+    inference_width=int(os.getenv("INFERENCE_WIDTH", "640")),
+    inference_height=int(os.getenv("INFERENCE_HEIGHT", "480")),
+)
 
+# Config from environment 
+config = SimpleNamespace(
+    ip=os.getenv("APP_IP", "0.0.0.0"),
+    port=int(os.getenv("APP_PORT", "1334")),
+    env=os.getenv("APP_ENV", "production").lower(), # "production" or "development"
+)
+
+# Ensure fr_instance runs .cleanup() before process termination
+atexit.register(lambda sig, frame: fr_instance.cleanup(force_exit=True))
 
 # ───────────────────────────── API Routes ─────────────────────────────────
 
-@app.route("/start", methods=["POST"])
-def start():
-    if fr.is_started:
+@app.route("/api/start_stream", methods=["POST"])
+def start_stream():
+    """API for frontend to start videoplayer stream"""
+    payload = request.get_json(silent=True)
+    stream_src = payload.get("stream_src")
+
+    if videoplayer.is_started():
         return _json({"stream": False, "message": "Stream already started!"})
 
-    stream_src = request.form.get("stream_src")
-    fr.start_stream(stream_src)
-    time.sleep(0.3)
+    videoplayer.start_stream(stream_src)
 
-    if not fr.streamThread.is_alive():
-        log_info("Stream thread died immediately")
-        fr.end_event.set()
-        return _json({"stream": False, "message": "Failed to start stream."})
+    # Poll the stream thread until it starts (if not assume it failed)
+    for delay in [0, 0.1, 0.2, 0.5, 1]:
+        time.sleep(delay)
+        if videoplayer.streamThread and videoplayer.streamThread.is_alive():
+            break
+        log_info(f"Stream thread not started, checking again in {delay}s...")
 
+    if not videoplayer.streamThread or not videoplayer.streamThread.is_alive():
+        log_info("Stream thread couldn't start")
+        fr_instance.cleanup()
+        return _json({"stream": False, "message": "Failed to start video stream. Check logs for details."})
+    
+    return _json({"stream": True, "message": "Success!"})
+
+
+@app.route("/api/start_fr", methods=["POST"])
+def start_fr():
+    """For frontend to load FR embeddings and start inference"""
     try:
-        fr.load_embeddings()
-        log_info(f"Loaded {len(fr.name_list)} names from captures: {fr.name_list}")
+        fr_instance.load_embeddings()
     except (ValueError, FileNotFoundError) as e:
-        fr.end_event.set()
-        return _json({"stream": False, "message": str(e)})
+        fr_instance.cleanup()
+        log_info(f"Couldn't load embeddings, {e}")
+        return _json({"inference": False, "message": "Failed to load embeddings. Check logs for details."})
 
-    fr.start_inference()
-    return _json({"stream": True, "message": "Success!"})
+    fr_instance.start_inference()
+    return _json({"inference": True, "message": "Success!"})
 
 
-@app.route("/end", methods=["POST"])
+@app.route("/api/end", methods=["POST"])
 def end():
-    if not fr.is_started:
+    """API for frontend to end FR"""
+
+    if not videoplayer.is_started():
         return _json({"stream": False, "message": "Stream not started!"})
-    fr.end_stream()
+
+    fr_instance.cleanup()
     return _json({"stream": True, "message": "Success!"})
 
 
-@app.route("/checkAlive")
-def check_alive():
-    alive = getattr(fr.streamThread, 'is_alive', lambda: False)()
-    return Response("Yes" if alive else "No", status=200)
+@app.route("/api/status", methods=["GET"])
+def status():
+    """API to check stream/inference status and last error"""
 
+    return _json({
+        "stream_state": videoplayer.stream_state,
+        "last_error": videoplayer.last_error,
+        "embeddings_loaded": getattr(fr_instance, "embeddings_loaded", False),
+        "embeddings_loading": getattr(fr_instance, "embeddings_loading", False),
+    })
 
-@app.route("/vidFeed")
+@app.route("/api/vidFeed", methods=["GET"])
 def video_feed():
-    if not config.video:
-        return Response("Video disabled", status=405)
-    return Response(fr.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    return Response(videoplayer.start_broadcast(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-
-@app.route("/frResults")
+@app.route("/api/frResults", methods=["GET"])
 def fr_results():
-    return Response(fr.start_detection_broadcast(), mimetype="application/json")
+    return Response(fr_instance.start_detection_broadcast(), mimetype="application/json")
 
-
-@app.route("/capture", methods=["POST"])
+prev_target = None
+@app.route("/api/capture", methods=["POST"])
 def capture():
-    payload = request.get_json(silent=True) or {}
-    name = payload.get("name") or request.form.get("name")
-    result = fr.capture_unknown(name)
+    payload = request.get_json(silent=True)
+    name = payload.get("name")
+    allow_duplicate = payload.get("allow_duplicate") 
+    result = fr_instance.capture_unknown(name, allow_duplicate)
+    
+    # Check if capture_unknown gave us a target crop; if so we need user confirmation
+    global prev_target
+    prev_target = result.get("crop", None)
+    if prev_target is not None:
+        return _json({"ok": result.get("ok"), "message": result.get("message")}, 202)
+    
     return _json(result, 200 if result.get("ok") else 400)
 
+@app.route("/api/capture/confirm", methods=["POST"])
+def confirm_capture():
+    payload = request.get_json(silent=True)
+    name = payload.get("name")
+    allow = payload.get("allow_duplicate") # Flask auto parses JSON boolean!
 
-@app.route("/submit_settings", methods=["POST"])
+    if allow: 
+        result = fr_instance.capture_unknown(name, allow_duplicate=True, target_image=prev_target)
+        return _json(result, 200 if result.get("ok") else 400)
+    return _json({"ok": True, "message": "User cancelled capture operation"}, 200)
+
+
+@app.route("/api/submit_settings", methods=["POST"])
 def submit_settings():
-    s = fr.fr_settings
-    new = {
-        "threshold": float(request.form.get("threshold", s["threshold"])),
-        "holding_time": float(request.form.get("holding_time", s["holding_time"])),
-        "use_brute_force": "use_brute_force" in request.form,
-        "perf_logging": "perf_logging" in request.form,
-        "use_differentiator": "use_differentiator" in request.form,
-        "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
-        "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
-        "use_persistor": "use_persistor" in request.form,
-        "threshold_prev": float(request.form.get("threshold_prev", s["threshold_prev"])),
-        "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
-        "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
-        "frame_skip": int(request.form.get("frame_skip", s.get("frame_skip", 1))),
-    }
-    fr.adjust_values(new)
-    return redirect(url_for('settings'))
+    try:
+        s = fr_instance.fr_settings
+        new = {
+            "threshold": float(request.form.get("threshold", s["threshold"])),
+            "holding_time": float(request.form.get("holding_time", s["holding_time"])),
+            "max_detections": int(request.form.get("max_detections", s["max_detections"])),
+            "perf_logging": "perf_logging" in request.form,
+            "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
+            "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
+            "video_width": int(request.form.get("video_width", s["video_width"])),
+            "video_height": int(request.form.get("video_height", s["video_height"])),
 
+            "use_differentiator": bool(request.form.get("use_differentiator", s["use_differentiator"])),
+            "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
+            "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
+            
+            "use_persistor": bool(request.form.get("use_persistor", s["use_persistor"])),
+            "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
+            "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
+            "threshold_sim": float(request.form.get("threshold_sim", s["threshold_sim"])),
+            "threshold_lenient_pers": float(request.form.get("threshold_lenient_pers", s["threshold_lenient_pers"])),
+        }
+
+        fr_instance.adjust_values(new)
+        return _json({"message":"success"}, 200)
+    except:
+        return _json({"message":"Failed to update settings"}, 500)
+
+
+@app.route("/api/get_settings", methods=["GET"])
+def get_settings():
+    return _json(fr_instance.fr_settings)
+
+
+@app.route("/api/get_reference_images", methods=["GET"])
+def get_reference_images():
+    images = _collect_reference_images()
+    return _json([{"name": n, "images": imgs} for n, imgs in sorted(images.items())])
+
+
+@app.route("/api/get_reference_names", methods=["GET"])
+def get_reference_names():
+    names = []
+
+    # From captures
+    captures_path = os.path.join("data", "captures")
+    if os.path.isdir(captures_path):
+        for name in os.listdir(captures_path):
+            names.append(name)
+
+    return _json(names)
+
+
+@app.route("/api/remove_image", methods=["POST"])
+def remove_image():
+    payload = request.get_json(silent=True) or {}
+    image_path = payload.get("image_path")
+
+    if not image_path:
+        return _json({"message": "Missing image_path"}, 400)
+
+    drive, _ = os.path.splitdrive(image_path)
+    if drive:
+        return _json({"message": "Invalid image_path"}, 400)
+
+    result = fr_instance.remove_capture_image(image_path)
+    if result.get("ok"):
+        return _json({"message": result.get("message", "Success!")})
+    return _json({"message": result.get("message", "Invalid image_path")}, 400)
+
+
+@app.route("/api/listCameras", methods=["GET"])
+def list_cameras():
+    """API to list available camera devices"""
+    response = _json(list_camera_devices())
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/api/get_performance", methods=["GET"])
+def get_performance():
+    """API to get backend performance"""
+    if fr_instance.last_perf is not None:
+        return _json(fr_instance.last_perf)
+    return _json({})
+# ───────────────────────────── Pages ──────────────────────────────────────
 
 @app.route("/api/reference_images")
 def api_reference_images():
@@ -139,7 +259,7 @@ def references():
 
 @app.route("/settings")
 def settings():
-    return render_template("settings.html", **fr.fr_settings)
+    return render_template("settings.html", **fr_instance.fr_settings) # Render with fr_settings as context
 
 
 @app.route('/data/<path:filename>')
@@ -149,8 +269,13 @@ def serve_data(filename):
 
 # ───────────────────────────── Helpers ────────────────────────────────────
 
-def _json(data, status=200):
-    return Response(json.dumps(data), status=status, mimetype='application/json')
+def _json(data, status: int | None = 200, headers: dict | None = None) -> Response:
+    '''Wrapper around json.dumps. Takes in data (Python list/dict) and optional status and headers'''
+    response = Response(json.dumps(data), status=status, mimetype='application/json')
+    if headers:
+        for key, value in headers.items():
+            response.headers[key] = value
+    return response
 
 
 def _collect_reference_images() -> dict:
@@ -175,7 +300,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Facial Recognition")
     parser.add_argument("-ip", "--ipaddress", type=str)
     parser.add_argument("-p", "--port", type=int)
-    parser.add_argument("-v", "--video", type=str)
     parser.add_argument("--env", type=str, choices=["development", "production"])
     parser.add_argument("--prod", action="store_true")
     args = parser.parse_args()
@@ -184,18 +308,16 @@ if __name__ == "__main__":
         config.ip = args.ipaddress
     if args.port:
         config.port = args.port
-    if args.video:
-        config.video = args.video.lower() == "true"
     if args.env:
         config.env = args.env
     if args.prod:
         config.env = "production"
 
-    signal.signal(signal.SIGINT, fr.cleanup)
+    # Cleanup upon interruption
+    signal.signal(signal.SIGINT, lambda sig, frame: fr_instance.cleanup(force_exit=True))
 
     if config.env == "production":
         try:
-            from waitress import serve
             log_info(f"Production mode on {config.ip}:{config.port}")
             serve(app, host=config.ip, port=config.port)
         except Exception as e:

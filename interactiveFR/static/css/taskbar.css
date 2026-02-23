@@ -3,6 +3,7 @@
     bottom: 0;
     left: 0;
     width: 100%;
+    z-index: 100;
     background-color: rgba(0, 0, 0, 0);
 }
 
@@ -12,20 +13,15 @@
     display: flex;
     justify-content: center;
     visibility: hidden;
-    transition: visibility 0s 0.3s, transform 0.3s ease-in-out;
+    transition:
+        visibility 0s 0.3s,
+        transform 0.3s ease-in-out;
     transform: translateY(100%);
 }
 
 .taskbar button {
-    padding: 1em 1.5em;
     margin-bottom: 0.5em;
     margin-right: 0.5em;
-    color: var(--color-foreground);
-    background-color: rgba(167, 50, 50, 0.8);
-    border-width: 0px;
-    border-radius: 1em;
-    cursor: pointer;
-    transition: background-color 0.2s ease, pointer-events 0.2s ease;
 }
 
 .taskbar button:hover {
@@ -72,7 +68,6 @@
 #reset-button:hover {
     background-color: rgba(180, 42, 42, 0.6);
 }
-
 
 .taskbar.show {
     visibility: visible;

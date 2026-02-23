@@ -90,7 +90,6 @@ class Records {
             }
         })
         console.log("All tags found:", Array.from(this.allTags))
-        console.log(this.data)
         this.createRecordsEl()
         this.applyAllFilters(); // This will update the attendance display with correct counts
     }

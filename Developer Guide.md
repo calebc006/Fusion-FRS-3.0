@@ -4,12 +4,14 @@ Technical documentation for SimpliFRy's facial recognition pipeline, tuning para
 
 ## Table of Contents
 
-- [FR Algorithm](#fr-algorithm)
-  - [Core Pipeline](#core-pipeline)
+- [Developer's Guide for SimpliFRy](#developers-guide-for-simplifry)
+  - [Table of Contents](#table-of-contents)
+  - [FR Algorithm](#fr-algorithm)
   - [Enhancement: Differentiator](#enhancement-differentiator)
   - [Enhancement: Persistor](#enhancement-persistor)
-- [Configuration](#configuration)
-- [API Endpoints](#api-endpoints)
+  - [Configuration](#configuration)
+  - [API Endpoints](#api-endpoints)
+  - [Performance Optimizations](#performance-optimizations)
 
 ---
 
@@ -17,7 +19,7 @@ Technical documentation for SimpliFRy's facial recognition pipeline, tuning para
 
 ### Core Pipeline
 
-![FR Algorithm Diagram](assets/fr_algorithm.jpg)
+![FR Algorithm Diagram](./simpliFRy/assets/fr_algorithm.jpg)
 
 1. **Database Indexing**: Face images are embedded via InsightFace and indexed in Voyager vector store (or stored as numpy array for brute force)
 2. **Face Detection**: Query image → InsightFace detects faces, produces embeddings
@@ -35,13 +37,11 @@ Technical documentation for SimpliFRy's facial recognition pipeline, tuning para
 
 ## Enhancement: Differentiator
 
-Addresses the threshold dilemma: strict thresholds reduce false positives but increase misses; lenient thresholds increase detection but false positives.
+Addresses the threshold dilemma: strict thresholds reduce false positives but increase misses; lenient thresholds increase detection but false positives. 
 
-**Key Insight**: False positives typically occur when top-2 similarity scores are close; legitimate matches show large score gaps.
-
-**Mechanism**: Retrieves top-2 closest embeddings:
-- If `(score₁ - score₂) > similarity_gap` → Use **lenient threshold** (high confidence in top match)
-- Otherwise → Use **strict threshold** (ambiguous match)
+**Mechanism**: 
+1. If detection fails using normal `threshold`, retrieves top-2 closest embeddings:
+2. If `dist(score₁, score₂) > similarity_gap` → Use **lenient threshold** (`threshold_lenient_diff`) and see if this allows for a match
 
 ---
 
@@ -50,16 +50,15 @@ Addresses the threshold dilemma: strict thresholds reduce false positives but in
 Handles head rotation/minor pose changes within a frame sequence. When a face fails standard detection, check if it matches a recently-detected individual within spatial + temporal constraints.
 
 **Mechanism**:
-1. On successful detection, store query embedding + bounding box for `holding_time` seconds
-2. If detection fails, check stored embeddings:
-   - BBox overlap (IOU) ≥ threshold AND
-   - Similarity to stored embedding ≤ strict threshold AND  
-   - Similarity to database embedding ≤ lenient threshold
-3. If all pass → recognition via persistor; update stored embedding
+1. On successful detection, store query embedding + bounding box in persistor queue (up to `q_max_size`)
+2. If detection fails, check persisted detections and see if
+   - BBox overlap with old detection (IOU) ≥ `threshold_iou` AND
+   - Cosine similarity to old detection ≥ `threshold_sim`   
+3. If both pass → Use **lenient threshold** (`threshold_lenient_pers`) and see if this allows for a match.
 
 **Execution Order**: Core FR → Differentiator → Persistor
 
-![Persistor Diagram](assets/persistor.JPG)
+![Persistor Diagram](./simpliFRy/assets/persistor.JPG)
 
 **Note**: Currently uses Intersection-Over-Union for position matching; consider DeepSORT for better temporal tracking. Can be disabled in settings if unreliable for your use case.
 
@@ -67,17 +66,19 @@ Handles head rotation/minor pose changes within a frame sequence. When a face fa
 
 ## Configuration
 
-Tunable parameters via `/submit_settings` endpoint (Settings UI posts here). All parameters are optional; unspecified values retain current settings.
+Tunable parameters via `/submit_settings` endpoint. Settings are saved to `settings.json` All parameters are optional; unspecified values retain current settings.
 
 ### Core Parameters
 
 | Parameter | Key | Default | Range | Description |
 |-----------|-----|---------|-------|-------------|
 | **FR Threshold** | `threshold` | 0.45 | [0.30, 0.90], step 0.01 | Max cosine distance for face match. Higher = more lenient |
-| **Holding Time** | `holding_time` | 3 | [1, 120]s, step 1 | Duration to cache recognized faces (affects persistor + sidebar display) |
-| **Use Brute Force** | `use_brute_force` | false | bool | Toggle between brute force (exact) and Voyager (fast ANN) search |
+| **Holding Time** | `holding_time` | 2 | [1, 120]s, step 1 | Duration to hold frontend display of detection |
+| **Max Detections** | `max_detections` | 50 | [5, 100], step 1 | Maximum number of detections processed by backend |
 | **Perf Logging** | `perf_logging` | false | bool | If enabled, periodically logs inference FPS, avg inference time, and search timings to `data/logs/` |
 | **Frame Skip** | `frame_skip` | 1 | [1, 10], step 1 | Process every Nth frame (1=no skip, 2=every other frame). Higher values reduce CPU/GPU load |
+| **Video Width** | `video_width` | 1920 | [1, 4000], step 1 | Width of video streamed to frontend |
+| **Video Height** | `video_height` | 1080 | [1, 4000], step 1 | Height of video streamed to frontend |
 
 ### Differentiator Parameters
 
@@ -92,8 +93,9 @@ Tunable parameters via `/submit_settings` endpoint (Settings UI posts here). All
 | Parameter | Key | Default | Range | Description |
 |-----------|-----|---------|-------|-------------|
 | **Enable** | `use_persistor` | true | bool | Toggle persistor mechanic |
-| **Persistor Threshold** | `threshold_prev` | 0.30 | [0.01, 0.60], step 0.01 | Max distance between query and cached embedding (strict) |
-| **IOU Threshold** | `threshold_iou` | 0.20 | [0.01, 1.00], step 0.01 | Min bbox overlap (low = lenient position check) |
+| **Max Queue Length** | `q_max_size` | 100 | [10, 500], step 10 | Max queue length for storing old detections for persistor |
+| **IOU Threshold** | `threshold_iou` | 0.70 | [0.01, 1.00], step 0.01 | Min bbox overlap (low = lenient position check) |
+| **Similarity Threshold** | `threshold_sim` | 0.60 | [0.01, 0.60], step 0.01 | Max distance between query and cached embedding (strict) |
 | **Lenient Threshold** | `threshold_lenient_pers` | 0.60 | [0.30, 0.90], step 0.01 | Max distance to database embedding. Should be > Differentiator Lenient |
 
 ---

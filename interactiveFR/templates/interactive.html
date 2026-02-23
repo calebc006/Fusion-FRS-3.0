@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="../static/css/main.css" />
     <link rel="stylesheet" href="../static/css/taskbar.css" />
     <link rel="stylesheet" href="../static/css/interactive.css" />
+    <link rel="stylesheet" href="../static/css/references.css" />
   </head>
   <body>
     <!-- Video feed goes here -->
@@ -17,9 +18,6 @@
       </object>
     </div>
 
-    <!-- Detection list goes here -->
-    <div class="table-detection-list" id="table-detection-list"></div>
-
     <!-- Capture panel -->
     <div id="capture-panel">
       <div class="capture-header">
@@ -28,14 +26,25 @@
           Target: <span id="capture-target" class="capture-target">None</span>
         </div>
       </div>
-      <input id="capture-name" type="text" placeholder="Enter name" autocomplete="off" />
+      <input
+        id="capture-name"
+        type="text"
+        placeholder="Enter name"
+        autocomplete="off"
+      />
       <button id="capture-button" disabled>Capture</button>
       <button id="references-panel-button" class="secondary-button">
         References
       </button>
     </div>
 
-    <div id="capture-toast" class="capture-toast" role="status" aria-live="polite"></div>
+    <!-- Toast -->
+    <div
+      id="toast"
+      class="toast"
+      role="status"
+      aria-live="polite"
+    ></div>
 
     <!-- Logos -->
     <div class="flex-container-logo">
@@ -51,15 +60,24 @@
         <div class="modal-header">
           <div class="modal-header-left">
             <h2>Reference Images</h2>
-            <button id="open-references-page" class="icon-button" aria-label="Open references page" title="Open references page">
+            <button
+              id="open-references-page"
+              class="icon-button"
+              aria-label="Open references page"
+              title="Open references page"
+            >
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z"></path>
+                <path
+                  d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z"
+                ></path>
                 <path d="M5 5h6v2H7v10h10v-4h2v6H5V5z"></path>
               </svg>
             </button>
           </div>
           <div>
-            <button id="close-references-modal" class="modal-close">&times;</button>
+            <button id="close-references-modal" class="modal-close">
+              &times;
+            </button>
           </div>
         </div>
         <div class="modal-body">
@@ -71,7 +89,7 @@
           </div>
           <div id="image-count" class="image-count"></div>
           <div id="image-gallery" class="image-gallery"></div>
-          <div id="no-images" class="no-images" style="display: none;">
+          <div id="no-images" class="no-images" style="display: none">
             No reference images found.
           </div>
         </div>
@@ -83,6 +101,14 @@
       <span class="lightbox-close">&times;</span>
       <img src="" alt="Full size" />
     </div>
+
+    <div class="bottom-info">
+      <!-- Performance log -->
+      <div id="perf-log" class="perf-log"></div>
+      <!-- Stream source label -->
+      <div id="stream-source" class="stream-source"></div>
+    </div>
+    
 
     <!-- Bottom Taskbar -->
     <div class="taskbar-placeholder">

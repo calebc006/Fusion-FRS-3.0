@@ -1,133 +1,237 @@
 // Reference Images Viewer
+import { showToast } from "./utils.js";
 
-let allData = [];
+let imageData = [];
+let initialized = false;
 
 const nameSelect = document.getElementById("name-select");
 const imageGallery = document.getElementById("image-gallery");
 const imageCount = document.getElementById("image-count");
 const noImages = document.getElementById("no-images");
 
-// Lightbox elements (create dynamically)
-const lightbox = document.createElement("div");
-lightbox.className = "lightbox";
-lightbox.innerHTML = `
-  <span class="lightbox-close">&times;</span>
-  <img src="" alt="Full size" />
-`;
-document.body.appendChild(lightbox);
+const toast = document.getElementById("toast");
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = lightbox?.querySelector("img");
+const lightboxCloseBtn = lightbox?.querySelector(".lightbox-close");
 
-const lightboxImg = lightbox.querySelector("img");
-const lightboxClose = lightbox.querySelector(".lightbox-close");
-
-lightboxClose.addEventListener("click", () => {
-  lightbox.classList.remove("active");
+// Initialize on the standalone references page
+window.addEventListener("DOMContentLoaded", async () => {
+    initReferencesUI({ autoLoad: true });
 });
 
-lightbox.addEventListener("click", (e) => {
-  if (e.target === lightbox) {
-    lightbox.classList.remove("active");
-  }
-});
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    lightbox.classList.remove("active");
-  }
-});
-
-async function loadReferenceImages() {
-  try {
-    const response = await fetch("/api/reference_images");
-    if (!response.ok) throw new Error("Failed to fetch");
-    allData = await response.json();
-
-    if (allData.length === 0) {
-      noImages.style.display = "block";
-      return;
+export function initReferencesUI({ autoLoad = true } = {}) {
+    if (initialized) {
+        if (autoLoad) {
+            loadReferenceImages({ preserveSelection: true });
+        }
+        return;
     }
 
-    // Populate dropdown
-    allData.forEach((person) => {
-      const option = document.createElement("option");
-      option.value = person.name;
-      option.textContent = `${person.name} (${person.images.length} images)`;
-      nameSelect.appendChild(option);
+    initialized = true;
+
+    if (lightboxCloseBtn) {
+        lightboxCloseBtn.addEventListener("click", () => {
+            handleLightboxClose();
+        });
+    }
+
+    lightbox?.addEventListener("click", () => {
+        handleLightboxClose();
     });
 
-    // Show all images by default (optional: or show nothing until selected)
-    showAllImages();
-  } catch (err) {
-    console.error("Error loading reference images:", err);
-    noImages.textContent = "Error loading reference images.";
-    noImages.style.display = "block";
-  }
+    document.addEventListener("keydown", () => {
+        handleLightboxClose();
+    });
+
+    nameSelect?.addEventListener("change", (e) => {
+        const selected = e.target.value;
+        if (selected) {
+            showPersonImages(selected);
+        } else {
+            showAllImages();
+        }
+    });
+
+    if (autoLoad) {
+        loadReferenceImages({ preserveSelection: true });
+    }
+}
+
+export function refreshReferenceImages({ preserveSelection = true } = {}) {
+    if (!initialized) {
+        initReferencesUI({ autoLoad: false });
+    }
+    loadReferenceImages({ preserveSelection });
+}
+
+// ------ Helper functions ------
+
+const removeDeleteButton = () => {
+    const deleteBtn = document.getElementById("delete-img-btn");
+    if (deleteBtn?.parentElement) {
+        deleteBtn.parentElement.removeChild(deleteBtn);
+    }
+};
+
+const handleLightboxClose = () => {
+    lightbox?.classList.remove("active");
+    removeDeleteButton();
+};
+
+async function loadReferenceImages({ preserveSelection = true } = {}) {
+    if (!nameSelect || !imageGallery || !imageCount || !noImages) return;
+
+    const selectedValue = preserveSelection ? nameSelect.value : "";
+
+    try {
+        const response = await fetch("/api/get_reference_images");
+        if (!response.ok) throw new Error("Failed to fetch reference images");
+        imageData = await response.json();
+
+        if (imageData.length === 0) {
+            noImages.style.display = "block";
+            imageCount.textContent = "";
+            imageGallery.innerHTML = "";
+            updateNameSelect("");
+            return;
+        }
+
+        noImages.style.display = "none";
+        updateNameSelect(selectedValue);
+        refreshView();
+    } catch (err) {
+        console.error("Error loading reference images:", err);
+        noImages.textContent = "Error loading reference images.";
+        noImages.style.display = "block";
+    }
 }
 
 function showAllImages() {
-  imageGallery.innerHTML = "";
-  let totalImages = 0;
+    imageGallery.innerHTML = "";
+    let totalImages = 0;
 
-  allData.forEach((person) => {
-    person.images.forEach((imgPath) => {
-      createImageCard(person.name, imgPath);
-      totalImages++;
+    if (imageData.length === 0) {
+        noImages.style.display = "block";
+        imageCount.textContent = "";
+        return;
+    }
+
+    noImages.style.display = "none";
+
+    imageData.forEach((person) => {
+        person.images.forEach((imgPath) => {
+            createImageCard(person.name, imgPath);
+            totalImages++;
+        });
     });
-  });
 
-  imageCount.textContent = `Showing ${totalImages} images from ${allData.length} people`;
+    imageCount.textContent = `Showing ${totalImages} images from ${imageData.length} people`;
 }
 
 function showPersonImages(name) {
-  const person = allData.find((p) => p.name === name);
-  if (!person) {
-    showAllImages();
-    return;
-  }
+    const person = imageData.find((p) => p.name === name);
+    if (!person) {
+        showAllImages();
+        return;
+    }
 
-  imageGallery.innerHTML = "";
-  person.images.forEach((imgPath) => {
-    createImageCard(person.name, imgPath);
-  });
+    imageGallery.innerHTML = "";
+    person.images.forEach((imgPath) => {
+        createImageCard(person.name, imgPath);
+    });
 
-  imageCount.textContent = `Showing ${person.images.length} images for "${name}"`;
+    imageCount.textContent = `Showing ${person.images.length} images for "${name}"`;
+}
+
+function updateNameSelect(selectedValue) {
+    nameSelect.innerHTML = '<option value="">-- All --</option>';
+    imageData.forEach((person) => {
+        const option = document.createElement("option");
+        option.value = person.name;
+        option.textContent = `${person.name} (${person.images.length} images)`;
+        nameSelect.appendChild(option);
+    });
+
+    if (selectedValue && imageData.some((p) => p.name === selectedValue)) {
+        nameSelect.value = selectedValue;
+    }
+}
+
+function removeImageFromData(imgPath) {
+    imageData = imageData
+        .map((person) => ({
+            ...person,
+            images: person.images.filter((p) => p !== imgPath),
+        }))
+        .filter((person) => person.images.length > 0);
+}
+
+function refreshView() {
+    const selected = nameSelect.value;
+    updateNameSelect(selected);
+    if (selected && imageData.some((p) => p.name === selected)) {
+        showPersonImages(selected);
+    } else {
+        showAllImages();
+    }
 }
 
 function createImageCard(name, imgPath) {
-  const card = document.createElement("div");
-  card.className = "image-card";
+    const card = document.createElement("div");
+    card.className = "image-card";
 
-  const img = document.createElement("img");
-  img.src = imgPath;
-  img.alt = name;
-  img.loading = "lazy";
+    const img = document.createElement("img");
+    img.src = imgPath;
+    img.alt = name;
+    img.loading = "lazy";
 
-  const label = document.createElement("div");
-  label.className = "image-name";
-  // Extract filename from path
-  const filename = imgPath.split("/").pop();
-  label.textContent = filename;
-  label.title = filename;
+    const label = document.createElement("div");
+    label.className = "image-name";
+    // Extract filename from path
+    const filename = imgPath.split("/").pop();
+    label.textContent = filename;
+    label.title = filename;
 
-  card.appendChild(img);
-  card.appendChild(label);
+    card.appendChild(img);
+    card.appendChild(label);
 
-  // Click to open lightbox
-  card.addEventListener("click", () => {
-    lightboxImg.src = imgPath;
-    lightbox.classList.add("active");
-  });
+    // Click to open lightbox, add delete-img-btn
+    card.addEventListener("click", () => {
+        lightboxImg.src = imgPath;
+        lightbox.classList.add("active");
 
-  imageGallery.appendChild(card);
+        const deleteBtn = document.createElement("button")
+        deleteBtn.id = "delete-img-btn"
+        deleteBtn.className = "delete-img-btn"
+        deleteBtn.innerHTML = "Remove Image"
+        lightbox.appendChild(deleteBtn)
+
+        deleteBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            showToast(toast, "Removing image...", "info")
+            
+            const relativePath = imgPath.replace("/data/captures", "");
+            const res = await fetch("/api/remove_image", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', 
+                },
+                body: JSON.stringify({"image_path": relativePath}),
+            });
+            
+            if (res.ok) {
+                showToast(toast, `Removed image: ${filename}`, "success")
+                removeImageFromData(imgPath);
+                handleLightboxClose();
+                refreshView();
+            } else {
+                showToast(toast, "Removal failed", "error");
+            }
+        })
+    });
+
+    imageGallery.appendChild(card);
 }
 
-nameSelect.addEventListener("change", (e) => {
-  const selected = e.target.value;
-  if (selected) {
-    showPersonImages(selected);
-  } else {
-    showAllImages();
-  }
-});
 
-// Initialize
-loadReferenceImages();

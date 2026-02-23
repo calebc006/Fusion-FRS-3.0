@@ -66,6 +66,18 @@ body {
     }
 }
 
+button {
+    padding: 1em 1.5em;
+    color: var(--color-foreground);
+    background-color: rgba(167, 50, 50, 0.8);
+    border-width: 0px;
+    border-radius: 1em;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        pointer-events 0.2s ease;
+}
+
 .bbox {
     position: absolute;
     background-color: transparent;
@@ -87,7 +99,7 @@ body {
 }
 
 .bbox-label {
-    font-size: 100%;
+    font-size: 18px;
     font-weight: bold;
     color: red;
     position: absolute;
@@ -99,15 +111,21 @@ body {
 }
 
 .bbox-label-unknown {
-    color: red;
+    display: none;
 }
 
 .bbox-label-identified {
     color: blue;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 .bbox-label-target {
     color: #00d06c;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 .bbox-score {
@@ -138,4 +156,42 @@ body {
     height: 80px;
     width: auto;
     margin-right: 20px;
+}
+
+/* Toast stuff */
+
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(35, 35, 50, 0.92);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+    pointer-events: none;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.is-success {
+    border: 1px solid #00d06c;
+}
+
+.toast.is-error {
+    border: 1px solid #d04a4a;
+}
+
+.toast.is-info {
+    border: 1px solid #2f7bdc;
 }

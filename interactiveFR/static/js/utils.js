@@ -21,31 +21,126 @@ export const updateBBoxes = (container, detections, opts = {}) => {
     const { showLabels = false, showUnknown = true } = opts;
     const existing = container.querySelectorAll(".bbox");
     const bboxData = [];
+    const SCORE_THRESHOLD = 0.9
 
-    const valid = detections.filter((d) => d.bbox && (showUnknown || d.label !== "Unknown"));
-
-    valid.forEach((d, i) => {
-        const isUnknown = d.label === "Unknown";
-        const isTarget = d.is_target === true;
-        const el = i < existing.length ? existing[i] : document.createElement("div");
-        if (i >= existing.length) container.appendChild(el);
-
-        el.className = `bbox ${isTarget ? "bbox-target" : "bbox-identified"}`;
-
-        if (showLabels && !isUnknown) {
-            const cls = `bbox-label ${isTarget ? "bbox-label-target" : "bbox-label-identified"}`;
-            const score = d.score != null ? d.score.toFixed(2) : "";
-            el.innerHTML = `<p class="${cls}">${d.label}${score ? ` <span class=\"bbox-score\">${score}</span>` : ""}</p>`;
-        } else {
-            el.innerHTML = "";
-        }
-
-        setBBoxPos(el, d.bbox, container.offsetWidth, container.offsetHeight);
-        bboxData.push(d.bbox);
+    // Filter detections with bboxes
+    const detectionsWithBbox = detections.filter((d) => {
+        if (!d.bbox) return false;
+        if (!d.score || d.score > SCORE_THRESHOLD) return false;
+        if (!showUnknown && d.label === "Unknown") return false;
+        return true;
     });
 
-    for (let i = valid.length; i < existing.length; i++) existing[i].remove();
+    detectionsWithBbox.forEach((detection, idx) => {
+        const isUnknown = detection.label === "Unknown";
+        const isTarget = detection.is_target === true;
+        let bboxEl;
+
+        if (idx < existingBoxes.length) {
+            // Reuse existing element
+            bboxEl = existingBoxes[idx];
+        } else {
+            // Create new element only if needed
+            bboxEl = document.createElement("div");
+            videoContainer.appendChild(bboxEl);
+        }
+
+        // Update classes: bbox + target/unknown/identified
+        if (isTarget) {
+            bboxEl.className = "bbox bbox-target";
+        } else {
+            bboxEl.className = isUnknown
+                ? "bbox bbox-unknown"
+                : "bbox bbox-identified";
+        }
+
+        // Update label content with matching classes
+        if (showLabels) {
+            if (isTarget) {
+                bboxEl.innerHTML = `<p class="bbox-label bbox-label-target">TARGET</p>`;
+            } else if (isUnknown) {
+                bboxEl.innerHTML = `<p class="bbox-label bbox-label-unknown">${detection.label} <span class="bbox-score">${detection.score?.toFixed(2) || ""}</span></p>`;
+            } else {
+                bboxEl.innerHTML = `<p class="bbox-label bbox-label-identified">${detection.label} <span class="bbox-score">${detection.score?.toFixed(2) || ""}</span></p>`;
+            }
+        } else {
+            bboxEl.innerHTML = "";
+        }
+
+        if (onBBoxCreate) onBBoxCreate(bboxEl, detection);
+
+        setBBoxPos(
+            bboxEl,
+            detection.bbox,
+            videoContainer.offsetWidth,
+            videoContainer.offsetHeight,
+        );
+
+        bboxData.push(detection.bbox);
+    });
+
+    // Remove extra boxes if we have fewer detections than before
+    for (let i = detectionsWithBbox.length; i < existingBoxes.length; i++) {
+        existingBoxes[i].remove();
+    }
+
     return bboxData;
 };
 
-export const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+export const delay = (time) => {
+    return new Promise((resolve) => setTimeout(resolve, time));
+};
+
+export const fetchStreamStatus = async () => {
+    const response = await fetch("/api/status");
+    return response.json();
+};
+
+// Waits several times for stream to start, if not assume stream failed
+export const waitForStream = async ({ attempts = 10, delayMs = 250 } = {}) => {
+    for (let i = 0; i < attempts; i += 1) {
+        const status = await fetchStreamStatus();
+        if (status.stream_state === "running") {
+            return status;
+        }
+        if (status.stream_state === "failed") {
+            return status;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return { stream_state: "failed", last_error: null };
+};
+
+export const waitForEmbeddings = async ({
+    attempts = 40,
+    delayMs = 250,
+} = {}) => {
+    for (let i = 0; i < attempts; i += 1) {
+        const status = await fetchStreamStatus();
+        if (status.stream_state === "failed") {
+            return status;
+        }
+        if (status.embeddings_loaded) {
+            return status;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return {
+        stream_state: "failed",
+        last_error: null,
+        embeddings_loaded: false,
+    };
+};
+
+// type = "info", "error", "success"
+export const showToast = (toast, message, type="info", duration_ms=3000) => {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.remove("is-success", "is-error", "is-info");
+    toast.classList.add(`is-${type}`);
+    toast.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+        toast.classList.remove("show");
+    }, duration_ms);
+};

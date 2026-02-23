@@ -36,10 +36,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
 // ENTRY POINT: Check if stream is started and immediately loads video feed if it has
 const startStream = (no_stream_callback = () => {}) => {
-    fetch("/checkAlive")
-        .then((response) => response.text())
+    fetch("/streamStatus")
+        .then((response) => response.json())
         .then((data) => {
-            if (data === "Yes") {
+            if (data.stream_state === "running") {
                 // Start detection overlays
                 fetchDetections();
             } else {
