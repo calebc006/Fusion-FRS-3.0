@@ -25,6 +25,7 @@ videoplayer = VideoPlayer(
     width=int(os.getenv("WIDTH", "1920")),
     height=int(os.getenv("HEIGHT", "1080")),
     fps=int(os.getenv("FPS", "25")),
+    jpg_quality=int(os.getenv("STREAM_JPG_QUALITY", "75"))
 )
 
 fr_instance = FREngine(
@@ -154,8 +155,6 @@ def submit_settings():
             "perf_logging": "perf_logging" in request.form,
             "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
             "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
-            "video_width": int(request.form.get("video_width", s["video_width"])),
-            "video_height": int(request.form.get("video_height", s["video_height"])),
 
             "use_differentiator": bool(request.form.get("use_differentiator", s["use_differentiator"])),
             "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),

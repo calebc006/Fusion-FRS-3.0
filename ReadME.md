@@ -39,7 +39,15 @@ For more information on installation, refer to the following:
 - [Gotendance](./gotendance/ReadME.md#installation)
 - [InteractiveFR](./interactiveFR/ReadME.md#install-and-run)
 
+## Recommended HIKVISION Camera Settings
 
+In Fusion Company, we typically use HIKVISION IP cameras to provide RTSP input during deployment. As of Feb 2026, we use the HIKVISION iDS-2CD7A46G0-IZHS. 
+
+Video settings can be adjusted in the HIKVISION Video Management Software. These are the typical settings we use, to balance low-latency and acceptable video quality.
+
+![Video Settings](./simpliFRy/assets/image.png)
+
+Image settings can also be changed to adjust exposure, contrast, dynamic range and more. These should be tuned to ensure a clear image given the lighting conditions of the deployment site. 
 
 ## License 
 

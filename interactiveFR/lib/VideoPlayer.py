@@ -114,6 +114,7 @@ class VideoSource:
                 "-buffer_size", "64k",
 
                 # Output to stdout
+                "-loglevel", "error",
                 "pipe:1",
             ]
         

@@ -32,5 +32,6 @@
 - [ ] Update docs
 
 ## Future
+- [ ] Two separate FFMPEG processes for RAW and MJPEG streams
 - [ ] Lazy loading for reference images
 - [ ] Implement TLS (https) for safer multi-location implementation

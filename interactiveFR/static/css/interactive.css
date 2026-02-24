@@ -15,26 +15,6 @@ body {
     gap: 10px;
 }
 
-/* .stream-source {
-    position: fixed;
-    bottom: 8px;
-    left: 12px;
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
-    z-index: 50;
-    pointer-events: none;
-}
-
-.perf-log {
-    position: fixed;
-    top: 8px;
-    left: 12px;
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
-    z-index: 50;
-    pointer-events: none;
-} */
-
 #video-container {
     position: absolute;
     margin: auto;
@@ -46,16 +26,6 @@ body {
     margin: 0;
 }
 
-.table-detection-list {
-    display: none;
-    position: absolute;
-    top: 35vh;
-    left: 60vw;
-    width: 30vw;
-    padding-left: 5px;
-    padding-right: 10px;
-}
-
 #capture-panel {
     position: absolute;
     bottom: 20px;
@@ -64,7 +34,8 @@ body {
     height: fit-content;
     padding: 16px;
     background: rgba(0, 0, 0, 0.3);
-    border: 2px solid #00d06c;
+    border: 2px solid transparent; 
+    box-sizing: border-box;
     border-radius: 10px;
     color: #fff;
     display: flex;
@@ -95,6 +66,10 @@ body {
 .capture-header.is-ready .capture-status {
     color: #00d06c;
     font-weight: 700;
+}
+
+#capture-panel.is-ready {
+    border: 2px solid #00d06c;
 }
 
 #capture-name {
