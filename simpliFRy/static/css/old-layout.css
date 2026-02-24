@@ -1,17 +1,17 @@
 #video-container {
     position: absolute;
     left: 50px;
-    top: 38vh;
+    top: 34vh;
 }
 
 #video-feed {
-    width: 44vw;
+    width: 50vw;
 }
 
 .table-detection-list {
     position: absolute;
     top: 35vh;
-    left: 60vw;
+    left: 61vw;
     width: 30vw;
     padding-left: 5px;
     padding-right: 10px;

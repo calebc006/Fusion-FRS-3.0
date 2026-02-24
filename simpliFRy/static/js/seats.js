@@ -491,7 +491,7 @@ const fetchDetections = () => {
     let buffer = "";
     let data = [];
 
-    fetch(`/frResults`)
+    fetch(`/api/frResults`)
         .then((response) => {
             if (!response.ok || !response.body) {
                 console.error("Fetch failed, retrying...");

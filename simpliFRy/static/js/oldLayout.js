@@ -11,7 +11,7 @@ let namelistJSON = undefined;
 let currData = [];
 
 window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
+    document.getElementById("video-feed").setAttribute("data", `/api/vidFeed?t=${Date.now()}`);
     let namelistPath = localStorage.getItem("namelistPath");
 
     loadNamelistJSON(namelistPath).then((data) => {
@@ -26,7 +26,7 @@ const fetchDetections = () => {
     let buffer = "";
     let data = [];
 
-    fetch(`/frResults`)
+    fetch(`/api/frResults`)
         .then((response) => {
             if (!response.ok || !response.body) {
                 console.error("Fetch failed, retrying...");

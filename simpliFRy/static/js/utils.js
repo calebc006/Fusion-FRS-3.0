@@ -228,3 +228,35 @@ export const updateBBoxes = (videoContainer, detections, options = {}) => {
 export const delay = (time) => {
     return new Promise((resolve) => setTimeout(resolve, time));
 };
+
+// type = "info", "error", "success"
+export const showToast = (toast, message, type="info", duration_ms=3000) => {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.remove("is-success", "is-error", "is-info");
+    toast.classList.add(`is-${type}`);
+    toast.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+        toast.classList.remove("show");
+    }, duration_ms);
+};
+
+export const waitForStream = async ({ attempts = 10, delayMs = 250 } = {}) => {
+    for (let i = 0; i < attempts; i += 1) {
+        const status = await fetchStreamStatus();
+        if (status.stream_state === "running") {
+            return status;
+        }
+        if (status.stream_state === "failed") {
+            return status;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return { stream_state: "failed", last_error: null };
+};
+
+export const fetchStreamStatus = async () => {
+    const response = await fetch("/api/status");
+    return response.json();
+};

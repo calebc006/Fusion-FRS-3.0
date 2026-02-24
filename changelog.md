@@ -21,8 +21,8 @@
 - [ ] Update docs and developer guide
 
 ### SimpliFRy
-- [ ] Reuse similar backend to InteractiveFR
-- [ ] Port over QOL UI changes (perf-logging, settings), refactor UI
+- [x] Reuse similar backend to InteractiveFR
+- [ ] Port over UI changes (perf-logging), rework init page logic, implement holding_time
 - [ ] Reliability and performance testing
 - [ ] Update docs
 

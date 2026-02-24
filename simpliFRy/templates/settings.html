@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -11,7 +11,16 @@
   </head>
   <body>
     <h1 class="title">Facial Recognition Settings</h1>
-    <form class="form" action="/submit_settings" method="POST">
+
+    <!-- Toast -->
+    <div
+      id="toast"
+      class="toast"
+      role="status"
+      aria-live="polite"
+    ></div>
+
+    <form id="settings-form" class="form">
       <fieldset class="form-section">
         <legend>Default Parameters</legend>
 
@@ -27,7 +36,6 @@
           required
         />
         <div class="break"></div>
-        <!-- Value below which a face would be considered recognised; the lower the stricter -->
 
         <label for="holding_time">Holding Time</label>
         <input
@@ -40,22 +48,20 @@
           step="0.1"
           required
         />
-        <div class="break"></div>
-        <!-- Time (in seconds) for which a name would be displayed after last recognition  -->
 
-        <label for="use_brute_force">Use Brute Force Search</label>
+        <div class="break"></div>
+
+        <label for="max_detections">Max Detections</label>
         <input
-          type="checkbox"
-          id="use_brute_force"
-          name="use_brute_force"
-          {%
-          if
-          use_brute_force
-          %}checked{%
-          endif
-          %}
+          type="number"
+          id="max_detections"
+          name="max_detections"
+          value="{{ max_detections }}"
+          min="1"
+          max="100"
+          step="1"
+          required
         />
-        <!-- Toggle between brute force (exact, slower) and Voyager (fast ANN) search -->
 
         <div class="break"></div>
 
@@ -71,11 +77,10 @@
           endif
           %}
         />
-        <!-- Logs stream/inference/search timing periodically to data/logs -->
 
         <div class="break"></div>
 
-        <label for="frame_skip">Frame Skip (Performance)</label>
+        <label for="frame_skip">Frame Interval (1 = every frame)</label>
         <input
           type="number"
           id="frame_skip"
@@ -86,7 +91,6 @@
           step="1"
           required
         />
-        <!-- Process every Nth frame (1=no skip, 2=every other frame, 3=every third frame). Higher values reduce CPU/GPU load -->
 
         <div class="break"></div>
 
@@ -101,7 +105,6 @@
           step="5"
           required
         />
-        <!-- Maximum rate at which detection results are broadcast to the frontend -->
       </fieldset>
 
       <fieldset class="form-section">
@@ -168,21 +171,33 @@
         />
         <div class="break"></div>
 
-        <label for="threshold_prev">Persistor Threshold</label>
+        <label for="q_max_size">Max Queue Size</label>
         <input
           type="number"
           class="persistor-inputs"
-          id="threshold_prev"
-          name="threshold_prev"
-          value="{{ threshold_prev|float|round(2) }}"
+          id="q_max_size"
+          name="q_max_size"
+          value="{{ q_max_size }}"
+          min="10"
+          max="500"
+          step="10"
+        />
+        <div class="break"></div>
+
+        <label for="threshold_sim">Minimum Similarity</label>
+        <input
+          type="number"
+          class="persistor-inputs"
+          id="threshold_sim"
+          name="threshold_sim"
+          value="{{ threshold_sim|float|round(2) }}"
           min="0.01"
           max="0.6"
           step="0.01"
         />
         <div class="break"></div>
-        <!-- The lower the stricter; persistor threshold is used to compare faces with previously identified faces (within holding time) -->
 
-        <label for="threshold_iou">IOU Threshold</label>
+        <label for="threshold_iou">Minimum IOU</label>
         <input
           type="number"
           class="persistor-inputs"
@@ -194,7 +209,6 @@
           step="0.01"
         />
         <div class="break"></div>
-        <!-- The higher the stricter; When comparing with previously identified faces, the bounding boxes must overlap with their intersected area at least a fraction of their union area -->
 
         <label for="threshold_lenient_pers">Lenient Threshold</label>
         <input
@@ -207,20 +221,19 @@
           max="0.9"
           step="0.01"
         />
-        <!-- The lower the stricter; This is a safeguard ensuring that faces fulfilling the above 2 criterias are not completely random but bear some recognition to faces in the database -->
       </fieldset>
 
-      <input type="submit" class="submit-button" value="Submit" />
+      <input type="submit" class="submit-button" id="submit-button" value="Submit" />
     </form>
 
     <!-- Bottom Taskbar -->
     <div class="taskbar-placeholder">
       <div class="taskbar">
-        <button id="home-button">Home</button>
+        <button id="home-button">Back</button>
       </div>
     </div>
 
-    <script src="../static/js/settings.js"></script>
-    <script src="../static/js/taskbar.js"></script>
+    <script type="module" src="../static/js/settings.js"></script>
+    <script type="module" src="../static/js/taskbar.js"></script>
   </body>
 </html>

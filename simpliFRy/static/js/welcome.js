@@ -36,7 +36,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
 // ENTRY POINT: Check if stream is started and immediately loads video feed if it has
 const startStream = (no_stream_callback = () => {}) => {
-    fetch("/streamStatus")
+    fetch("/api/status")
         .then((response) => response.json())
         .then((data) => {
             if (data.stream_state === "running") {
@@ -99,7 +99,7 @@ export const fetchDetections = () => {
     let buffer = "";
     let data = [];
 
-    fetch(`/frResults`).then((response) => {
+    fetch(`/api/frResults`).then((response) => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
@@ -208,7 +208,7 @@ const openVideoModalButton = document.getElementById("open-video-modal-button");
 if (openVideoModalButton) {
     openVideoModalButton.addEventListener("click", () => {
         const videoFeed = document.getElementById("video-feed");
-        videoFeed.setAttribute("data", `/vidFeed?t=${Date.now()}`);
+        videoFeed.setAttribute("data", `/api/vidFeed?t=${Date.now()}`);
 
         showVideoModal();
     });

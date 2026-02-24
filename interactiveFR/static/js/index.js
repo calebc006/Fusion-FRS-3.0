@@ -1,5 +1,4 @@
 import {
-    waitForEmbeddings,
     waitForStream,
 } from "./utils.js";
 
@@ -8,9 +7,9 @@ const cameraSelect = document.getElementById("camera_device_select");
 
 window.addEventListener("DOMContentLoaded", async () => {
     try {
-        // if (localStorage.getItem("streamSrc") != null) {
-        //     window.location.href = "/interactive";
-        // }
+        if (localStorage.getItem("streamSrc") != null) {
+            window.location.href = "/interactive";
+        }
     } catch (error) {
         console.log(error);
     }
@@ -96,7 +95,7 @@ document.getElementById("init").onsubmit = async (event) => {
         
         if (!data.inference) {
             loading.remove();
-            submitButton.style.display = "block"
+            submitButton.style.display = "block";
 
             alert(data.message || "Failed to start FR");
             return;
@@ -107,7 +106,7 @@ document.getElementById("init").onsubmit = async (event) => {
         const status = await waitForStream();
         
         loading.remove();
-        submitButton.style.display = "block"
+        submitButton.style.display = "block";
         if (status.stream_state === "running") {
             window.location.href = "/interactive";
         } else {
@@ -150,7 +149,7 @@ const Loading = (formEl) => {
         let dotCount = 0;
         const updateLoadingText = () => {
             dotCount = (dotCount % 3) + 1;
-            loaderEl.innerText = text + ".".repeat(dotCount);
+            loader.innerText = text + ".".repeat(dotCount);
         };
 
         intervalId =  setInterval(updateLoadingText, 500);
