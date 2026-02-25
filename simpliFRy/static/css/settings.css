@@ -21,3 +21,8 @@
     background-color: rgb(35, 65, 65);
     cursor: pointer;
 }
+
+.title {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 2em;
+}

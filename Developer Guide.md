@@ -72,29 +72,30 @@ Tunable parameters via `/submit_settings` endpoint. Settings are saved to `setti
 
 | Parameter | Key | Default | Range | Description |
 |-----------|-----|---------|-------|-------------|
-| **FR Threshold** | `threshold` | 0.45 | [0.30, 0.90], step 0.01 | Max cosine distance for face match. Higher = more lenient |
-| **Holding Time** | `holding_time` | 2 | [1, 120]s, step 1 | Duration to hold frontend display of detection |
-| **Max Detections** | `max_detections` | 50 | [5, 100], step 1 | Maximum number of detections processed by backend |
+| **FR Threshold** | `threshold` | 0.45 | [0.10, 0.90], step 0.01 | Max cosine distance for face match. Higher = more lenient |
+| **Holding Time** | `holding_time` | 2 | [0, 100]s, step 0.1 | Duration to hold frontend display of detection |
+| **Max Detections** | `max_detections` | 50 | [1, 100], step 1 | Maximum number of detections processed by backend |
 | **Perf Logging** | `perf_logging` | false | bool | If enabled, periodically logs inference FPS, avg inference time, and search timings to `data/logs/` |
 | **Frame Skip** | `frame_skip` | 1 | [1, 10], step 1 | Process every Nth frame (1=no skip, 2=every other frame). Higher values reduce CPU/GPU load |
+| **Max Broadcast FPS** | `max_broadcast_fps` | 50 | [5, 20], step 5 | Process every Nth frame (1=no skip, 2=every other frame). Higher values reduce CPU/GPU load |
 
 ### Differentiator Parameters
 
 | Parameter | Key | Default | Range | Description |
 |-----------|-----|---------|-------|-------------|
 | **Enable** | `use_differentiator` | true | bool | Toggle differentiator mechanic |
-| **Lenient Threshold** | `threshold_lenient_diff` | 0.55 | [0.30, 0.90], step 0.01 | Threshold when score gap > similarity_gap. Should be > FR Threshold |
-| **Similarity Gap** | `similarity_gap` | 0.10 | [0.01, 0.20], step 0.01 | Min score difference to trigger lenient threshold |
+| **Lenient Threshold** | `threshold_lenient_diff` | 0.55 | [0.10, 0.90], step 0.01 | Threshold when score gap > similarity_gap. Should be > FR Threshold |
+| **Similarity Gap** | `similarity_gap` | 0.10 | [0.01, 0.30], step 0.01 | Min score difference to trigger lenient threshold |
 
 ### Persistor Parameters
 
 | Parameter | Key | Default | Range | Description |
 |-----------|-----|---------|-------|-------------|
 | **Enable** | `use_persistor` | true | bool | Toggle persistor mechanic |
-| **Max Queue Length** | `q_max_size` | 100 | [10, 500], step 10 | Max queue length for storing old detections for persistor |
-| **IOU Threshold** | `threshold_iou` | 0.70 | [0.01, 1.00], step 0.01 | Min bbox overlap (low = lenient position check) |
+| **Max Queue Length** | `q_max_size` | 100 | [10, 10000], step 1 | Max queue length for storing old detections for persistor |
+| **IOU Threshold** | `threshold_iou` | 0.70 | [0.1, 0.9], step 0.01 | Min bbox overlap (low = lenient position check) |
 | **Similarity Threshold** | `threshold_sim` | 0.60 | [0.01, 0.60], step 0.01 | Max distance between query and cached embedding (strict) |
-| **Lenient Threshold** | `threshold_lenient_pers` | 0.60 | [0.30, 0.90], step 0.01 | Max distance to database embedding. Should be > Differentiator Lenient |
+| **Lenient Threshold** | `threshold_lenient_pers` | 0.60 | [0.10, 0.90], step 0.01 | Max distance to database embedding. Should be > Differentiator Lenient |
 
 ---
 
