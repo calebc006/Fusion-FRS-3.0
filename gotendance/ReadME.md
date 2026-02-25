@@ -120,15 +120,20 @@ Ensure all three components remain in the same directory. The application will r
 2. Prepare a JSON file with the personnel list in the following format:
    ```json
    {
-     "data": [
-       {"label": "John Doe"},
-       {"label": "Jane Smith"},
-       {"label": "Alex Johnson"}
-     ]
+      "details": [
+         {
+               "name": "John Doe",
+               "tags": ["Army", "DIS"], // optional
+         },
+         {
+               "name": "3SG CALEB CHIA",
+               "tags": ["Air Force"], // optional
+         }
+      ]
    }
    ```
    
-   A sample file is provided at `assets/test.json`. For more details on data preparation, see the [simpliFRy data preparation guide](../simpliFRy/ReadME.md#data-preparation).
+   A sample file is provided at `assets/test.json`. For more details on data preparation, see the [simpliFRy data preparation guide](../simpliFRy/ReadME.md#data-preparation). The same JSON file can be used for SimpliFRy and Gotendance!
 
 3. Click the file input, select your JSON file, and click the upload icon
 
@@ -155,8 +160,8 @@ Gotendance listens to HTTP streaming responses from services like simpliFRy to a
    ```
 
 3. Set the **Update Interval** (in seconds):
-   - This controls how often gotendance processes the incoming stream
-   - Lower values = more frequent updates but higher CPU usage
+   - This controls how often gotendance processes the incoming stream. 
+   - Lower values = more frequent updates
 
 4. Click **Submit** to add the stream
 

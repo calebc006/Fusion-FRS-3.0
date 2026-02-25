@@ -1,20 +1,37 @@
+import { waitForStream } from "./utils.js"
+
 const customInput = document.getElementById("stream_src_custom");
 const form = document.getElementById("init");
 const postInitMenu = document.getElementById("info-menu");
 let namelistPath = null;
 
 window.addEventListener("DOMContentLoaded", async () => {
-    // Show form and hide post-init menu
-    postInitMenu.style.display = "none";
-    form.style.display = "flex";
-
-    // Check if initialized
+    // First check if initialized - for quick UI update
     if (localStorage.getItem("initialized") === "true") {
         // Hide form and show post-init menu 
         form.style.display = "none";
         postInitMenu.style.display = "flex";
         document.getElementById("stream-url").textContent = localStorage.getItem("streamSrc") || "N/A";
         document.getElementById("namelist-path").textContent = localStorage.getItem("namelistPath") || "N/A";
+    } else {
+        // Show form and hide post-init menu
+        postInitMenu.style.display = "none";
+        form.style.display = "flex";
+        localStorage.setItem("initialized", false);
+    }
+
+    let status = await waitForStream({attempts: 10, delayMs: 50});
+    if (status.stream_state === "running") {
+        // Hide form and show post-init menu 
+        form.style.display = "none";
+        postInitMenu.style.display = "flex";
+        document.getElementById("stream-url").textContent = localStorage.getItem("streamSrc") || "N/A";
+        document.getElementById("namelist-path").textContent = localStorage.getItem("namelistPath") || "N/A";
+    } else {
+        // Show form and hide post-init menu
+        postInitMenu.style.display = "none";
+        form.style.display = "flex";
+        localStorage.setItem("initialized", false);
     }
 });
 

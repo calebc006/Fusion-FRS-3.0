@@ -1,3 +1,5 @@
+import { waitForStream } from "./utils.js"
+
 const customRTSP = document.getElementById("stream_src_custom");
 const cameraSelect = document.getElementById("camera_device_select");
 const form = document.getElementById("init");
@@ -5,15 +7,28 @@ const postInit = document.getElementById("post-init");
 const streamUrlDisplay = document.getElementById("stream-url");
 
 window.addEventListener("DOMContentLoaded", async () => {
-    form.style.display = "flex";
-    postInit.style.display = "none";
-
-    // Check if initialized
+    // First check if initialized - for quick UI update
     if (localStorage.getItem("initialized") === "true") {
         // Hide form and show post-init menu 
         form.style.display = "none";
         postInit.style.display = "flex";
-        streamUrlDisplay.innerText = localStorage.getItem("streamSrc");
+    } else {
+        // Show form and hide post-init menu
+        postInit.style.display = "none";
+        form.style.display = "flex";
+        localStorage.setItem("initialized", false);
+    }
+
+    let status = await waitForStream({attempts: 10, delayMs: 50});
+    if (status.stream_state === "running") {
+        // Hide form and show post-init menu 
+        form.style.display = "none";
+        postInit.style.display = "flex";
+    } else {
+        // Show form and hide post-init menu
+        postInit.style.display = "none";
+        form.style.display = "flex";
+        localStorage.setItem("initialized", false);
     }
 });
 

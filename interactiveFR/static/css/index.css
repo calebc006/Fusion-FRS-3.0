@@ -178,6 +178,10 @@
     cursor: pointer;
 }
 
+#init {
+    display: none;
+}
+
 input,
 select.init-input {
     padding: 0.3em;
