@@ -124,7 +124,8 @@ class VoyagerEmbeddingIndex:
         self.embeddings_list.pop(idx)
 
         self.vector_index = voyager.Index(voyager.Space.Cosine, num_dimensions=self.n_dimensions)
-        self.vector_index.add_items(self.embeddings_list)
+        if len(self.embeddings_list) > 0:
+            self.vector_index.add_items(self.embeddings_list)
 
     def query(self, embedding, k=1):
         return self.vector_index.query(embedding, k)
@@ -187,6 +188,7 @@ class FREngine:
         self.capture_lock = threading.Lock()
         self.latest_target_frame: np.ndarray | None = None
         self.latest_target_detection: dict | None = None
+        os.makedirs(os.path.join("data", "captures"), exist_ok=True) # ensure captures directory exists
         
         # Other state
         self.persisted_detections: deque[FRResult] = deque(maxlen=self.fr_settings["q_max_size"])

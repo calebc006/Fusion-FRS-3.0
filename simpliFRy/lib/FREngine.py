@@ -126,7 +126,8 @@ class VoyagerEmbeddingIndex:
         self.embeddings_list.pop(idx)
 
         self.vector_index = voyager.Index(voyager.Space.Cosine, num_dimensions=self.n_dimensions)
-        self.vector_index.add_items(self.embeddings_list)
+        if len(self.embeddings_list) > 0:
+            self.vector_index.add_items(self.embeddings_list)
 
     def query(self, embedding, k=1):
         return self.vector_index.query(embedding, k)

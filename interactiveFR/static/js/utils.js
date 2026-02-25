@@ -180,8 +180,9 @@ export const updateBBoxes = (videoContainer, detections, options = {}) => {
 
     // Filter detections with bboxes
     const detectionsWithBbox = detections.filter((d) => {
-        if (!d.bbox) return false;
-        if (!d.score || d.score > SCORE_THRESHOLD) return false;
+        if (!d.bbox || !d.score) return false;
+        if (showUnknown && d.is_target === true) return true; // always let target through, regardless of score
+        if (d.score > SCORE_THRESHOLD) return false;
         if (!showUnknown && d.label === "Unknown") return false;
         return true;
     });
