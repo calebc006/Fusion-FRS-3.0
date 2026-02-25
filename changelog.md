@@ -18,17 +18,17 @@
 - [x] Catch and warn user when capturing with an existing name. Confirmation required via separate API path `/capture/confirm`.
 - [x] UI changes: Enlarged video feed, improved capture/remove image toasts, changed bbox labels (only display for target and identified faces), added settings submit toast, capture on "ENTER"
 - [ ] Reliability and performance testing
-- [ ] Update docs and developer guide
+- [x] Update docs and developer guide
 
 ### SimpliFRy
 - [x] Reused similar backend to InteractiveFR
 - [x] Ported over UI changes, reworked init page logic, implemented holding_time on frontend
 - [ ] Reliability and performance testing
-- [ ] Update docs
+- [x] Update docs
 
 ### Gotendance
 - [x] Confirm that we aren't dropping any detections, even with high update interval
-- [ ] Update docs
+- [x] Update docs
 
 ## Future
 - [ ] Convert all thresholds to cosine *similarity* (higher = better match)

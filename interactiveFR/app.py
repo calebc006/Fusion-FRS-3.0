@@ -156,11 +156,11 @@ def submit_settings():
             "frame_skip": int(request.form.get("frame_skip", s["frame_skip"])),
             "max_broadcast_fps": int(request.form.get("max_broadcast_fps", s["max_broadcast_fps"])),
 
-            "use_differentiator": bool(request.form.get("use_differentiator", s["use_differentiator"])),
+            "use_differentiator": bool(request.form.get("use_differentiator", None) == "on"),
             "threshold_lenient_diff": float(request.form.get("threshold_lenient_diff", s["threshold_lenient_diff"])),
             "similarity_gap": float(request.form.get("similarity_gap", s["similarity_gap"])),
             
-            "use_persistor": bool(request.form.get("use_persistor", s["use_persistor"])),
+            "use_persistor": bool(request.form.get("use_persistor", None) == "on"),
             "q_max_size": int(request.form.get("q_max_size", s["q_max_size"])),
             "threshold_iou": float(request.form.get("threshold_iou", s["threshold_iou"])),
             "threshold_sim": float(request.form.get("threshold_sim", s["threshold_sim"])),
