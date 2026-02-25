@@ -96,7 +96,7 @@ func handleResult(result []Detection, store *Store) {
 
 func Stream(store *Store, stopChan chan struct{}, resultsUrl string, updateInterval time.Duration) {
 	var (
-		latestData []Detection
+		detections_queue = make(map[string]Detection)
 		mu sync.Mutex
 	)
 
@@ -111,7 +111,10 @@ func Stream(store *Store, stopChan chan struct{}, resultsUrl string, updateInter
 				return
 			case <-ticker.C:
 				mu.Lock()
-				handleResult(latestData, store)
+				for _, det := range detections_queue {
+					handleResult([]Detection{det}, store)
+				}
+				detections_queue = make(map[string]Detection) // clear for next interval
 				mu.Unlock()
 			}
 		}
@@ -153,7 +156,12 @@ func Stream(store *Store, stopChan chan struct{}, resultsUrl string, updateInter
 			}
 
 			mu.Lock()
-			latestData = result.Data
+			for _, det := range result.Data {
+				if det.Label == "Unknown" {
+					continue
+				} 
+				detections_queue[det.Label] = det   // overwrites older detection
+			}
 			mu.Unlock()
 		}
 	}

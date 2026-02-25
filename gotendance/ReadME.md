@@ -141,8 +141,8 @@ Gotendance listens to HTTP streaming responses from services like simpliFRy to a
 1. **Ensure your result stream service is running** (e.g., simpliFRy)
 
 2. In the **FR Results Stream URL** section, enter the stream URL:
-   - For simpliFRy: `http://<IP>:<PORT>/frResults`
-   - Example: `http://192.168.1.100:5000/frResults`
+   - For simpliFRy: `http://<IP>:<PORT>/api/frResults`
+   - Example: `http://192.168.1.100:5000/api/frResults`
    
    The stream should provide data in this format:
    ```json
@@ -157,8 +157,6 @@ Gotendance listens to HTTP streaming responses from services like simpliFRy to a
 3. Set the **Update Interval** (in seconds):
    - This controls how often gotendance processes the incoming stream
    - Lower values = more frequent updates but higher CPU usage
-   - Recommended: Keep it less than the [Holding Time](../simpliFRy/Developer%20Guide.md#holding-time) of simpliFRy to avoid missing detections
-   - Default suggestion: 1-5 seconds
 
 4. Click **Submit** to add the stream
 

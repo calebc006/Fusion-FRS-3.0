@@ -4,14 +4,20 @@ import {
     getTable,
     getDescription,
     sortDetectionsByPriority,
+    fetchSettings 
 } from "./utils.js";
 
 const detectionList = document.getElementById("table-detection-list");
 let namelistJSON = undefined;
-let currData = [];
+
+let HOLD_TIME = 100;
+fetchSettings().then(settings => {
+    HOLD_TIME = settings.holding_time * 1000; 
+});
+const activeDetections = new Map(); // name -> { lastSeen, detection }
 
 window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("video-feed").setAttribute("data", `/vidFeed?t=${Date.now()}`);
+    document.getElementById("video-feed").setAttribute("data", `/api/vidFeed?t=${Date.now()}`);
     let namelistPath = localStorage.getItem("namelistPath");
 
     loadNamelistJSON(namelistPath).then((data) => {
@@ -26,7 +32,7 @@ const fetchDetections = () => {
     let buffer = "";
     let data = [];
 
-    fetch(`/frResults`)
+    fetch(`/api/frResults`)
         .then((response) => {
             if (!response.ok || !response.body) {
                 console.error("Fetch failed, retrying...");
@@ -62,9 +68,10 @@ const fetchDetections = () => {
                     buffer = parts[parts.length - 1] || "";
 
                     const videoContainer = document.getElementById("video-container");
-                    currData = updateBBoxes(videoContainer, data, { showLabels: false, showUnknown: true });
-                    
+                    updateBBoxes(videoContainer, data, { showLabels: false, showUnknown: true });
                     updateDetectionList(data);
+
+                    // Recursive call
                     processStream();
                 });
             };
@@ -78,30 +85,46 @@ const fetchDetections = () => {
 };
 
 const updateDetectionList = (data) => {
-    let detections = [];
+    const now = Date.now();
 
+    // Update / refresh detections from stream
     data.forEach((detection) => {
         const name = detection.label.toUpperCase();
-        if (name == "UNKNOWN") {
-            return;
-        }
+        if (name === "UNKNOWN") return;
 
-        let table = getTable(name, namelistJSON);
-        if (table == null) {
-            table = "";
-        } else {
-            table = "(" + table + ")"; 
+        activeDetections.set(name, {
+            lastSeen: now,
+            detection
+        });
+    });
+
+    // Remove expired detections
+    for (const [name, entry] of activeDetections.entries()) {
+        if (now - entry.lastSeen > HOLD_TIME) {
+            activeDetections.delete(name);
         }
+    }
+
+    // Render from activeDetections
+    let detections = [];
+
+    for (const [name, entry] of activeDetections.entries()) {
+        let table = getTable(name, namelistJSON);
+        table = table ? `(${table})` : "";
 
         let description = getDescription(name, namelistJSON);
 
         let detectionEl = document.createElement("div");
         detectionEl.classList.add("table-detection-element");
-        detectionEl.dataset.name = name; // For priority sorting
-        detectionEl.innerHTML = `<span class="detection-name">${name} ${table}</span>${description ? `<span class="detection-desc">${description}</span>` : ""}`;
+        detectionEl.dataset.name = name;
+
+        detectionEl.innerHTML = `
+            <span class="detection-name">${name} ${table}</span>
+            ${description ? `<span class="detection-desc">${description}</span>` : ""}
+        `;
 
         detections.push(detectionEl);
-    });
+    }
 
     detections = sortDetectionsByPriority(detections, namelistJSON);
     detectionList.replaceChildren(...detections);

@@ -6,6 +6,7 @@ import {
     updateBBoxes,
     loadNamelistJSON,
     sortDetectionsByPriority,
+    fetchSettings
 } from "./utils.js";
 
 const N = 3; // number of detections shown (last N)
@@ -16,6 +17,12 @@ const videoModal = document.getElementById("video-modal");
 const videoContainer = document.getElementById("video-container");
 let namelistPath = null;
 let namelistJSON = undefined;
+
+let HOLD_TIME = 100;
+fetchSettings().then(settings => {
+    HOLD_TIME = settings.holding_time * 1000; 
+});
+const activeDetections = new Map(); // name -> { lastSeen, detection }
 let currData = [];
 
 window.addEventListener("DOMContentLoaded", async () => {
@@ -26,6 +33,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         loadNamelistJSON(namelistPath).then((data) => {
             namelistJSON = data;
             console.log("loaded namelist")
+            console.log(namelistJSON)
         });
     }
 
@@ -36,7 +44,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
 // ENTRY POINT: Check if stream is started and immediately loads video feed if it has
 const startStream = (no_stream_callback = () => {}) => {
-    fetch("/streamStatus")
+    fetch("/api/status")
         .then((response) => response.json())
         .then((data) => {
             if (data.stream_state === "running") {
@@ -68,38 +76,13 @@ const updateCountryFlag = (detectionName) => {
     }
 };
 
-// Update detection list with new element
-const addDetectionEl = (name, description) => {
-    const detectionEl = document.createElement("div");
-    detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${
-        description === null
-            ? ""
-            : `<p class="detectionDesc">${description}</p>`
-    }`;
-    detectionEl.classList.add("detectionEntry");
-    detectionEl.dataset.name = name; // For priority sorting
-
-    detectionList.appendChild(detectionEl);
-
-    // show last N detections, sorted by priority
-    if (detectionList.children.length > N) {
-        detectionList.replaceChildren(
-            ...sortDetectionsByPriority([...detectionList.children], namelistJSON).slice(-N)
-        );
-    } else {
-        detectionList.replaceChildren(
-            ...sortDetectionsByPriority([...detectionList.children], namelistJSON)
-        );
-    }
-};
-
 // MAIN LOOP
 export const fetchDetections = () => {
     console.log("FETCHING...");
     let buffer = "";
     let data = [];
 
-    fetch(`/frResults`).then((response) => {
+    fetch(`/api/frResults`).then((response) => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
@@ -126,9 +109,13 @@ export const fetchDetections = () => {
                 }
 
                 buffer = parts[parts.length - 1];
+                
+                const videoContainer = document.getElementById("video-container");
+                currData = updateBBoxes(videoContainer, data, { showLabels: true, showUnknown: true });
                 updateDetections(data);
 
-                processStream();
+                // Recursive call
+                processStream(); 
             });
         };
 
@@ -147,36 +134,55 @@ export const endDetections = () => {
 };
 
 const updateDetections = (data) => {
-    detectionList.innerHTML = "";
-    const uniqueLabels = new Set();
-    let mostRecentDetection = null;
+    const now = Date.now();
 
-    // Process detections for the list (non-bbox related)
+    // Update / refresh detections from stream
     data.forEach((detection) => {
-        const unknown = detection.label === "Unknown";
+        const name = detection.label.toUpperCase();
+        if (name === "UNKNOWN") return;
 
-        if (!unknown && !uniqueLabels.has(detection.label)) {
-            const description = getDescription(detection.label, namelistJSON);
-            addDetectionEl(detection.label, description);
-            uniqueLabels.add(detection.label);
-        }
-
-        // Track the last non-unknown detection as the most recent
-        if (!unknown) {
-            mostRecentDetection = detection.label;
-        }
+        activeDetections.set(name, {
+            lastSeen: now,
+            detection
+        });
     });
 
-    // Use optimized bbox update utility with labels shown
-    currData = updateBBoxes(videoContainer, data, { showLabels: true, showUnknown: true });
-
-    // Update country flag for the latest detection
-    if (mostRecentDetection) {
-        updateCountryFlag(mostRecentDetection);
-    } else {
-        // No identified detections in current list, hide flag
-        countryFlagImg.style.display = "none";
+    // Remove expired detections
+    for (const [name, entry] of activeDetections.entries()) {
+        if (now - entry.lastSeen > HOLD_TIME) {
+            activeDetections.delete(name);
+        }
     }
+
+    // Render from activeDetections
+    let detections = [];
+
+    for (const [name, entry] of activeDetections.entries()) {
+        let description = getDescription(name, namelistJSON);
+
+        const detectionEl = document.createElement("div");
+        detectionEl.innerHTML = `<p class="detectionName">${name}</p> ${
+            description === null
+                ? ""
+                : `<p class="detectionDesc">${description}</p>`
+        }`;
+        detectionEl.classList.add("detectionEntry");
+        detectionEl.dataset.name = name; // For priority sorting
+
+        detections.push(detectionEl);
+    }
+
+    // Sort detections and take top N
+    detections = sortDetectionsByPriority(detections, namelistJSON);
+    if (detections.length > N) 
+        detections = detections.slice(-N);
+    
+    detectionList.replaceChildren(...detections);
+
+    // Update country flag based on top detection
+    const topDetection = detections[0]?.label;
+    if (topDetection)
+        updateCountryFlag(topDetection);
 };
 
 // -------- VIDEO MODAL STUFF ----------
@@ -208,7 +214,7 @@ const openVideoModalButton = document.getElementById("open-video-modal-button");
 if (openVideoModalButton) {
     openVideoModalButton.addEventListener("click", () => {
         const videoFeed = document.getElementById("video-feed");
-        videoFeed.setAttribute("data", `/vidFeed?t=${Date.now()}`);
+        videoFeed.setAttribute("data", `/api/vidFeed?t=${Date.now()}`);
 
         showVideoModal();
     });

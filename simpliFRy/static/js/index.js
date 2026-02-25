@@ -1,26 +1,21 @@
 const customInput = document.getElementById("stream_src_custom");
 const form = document.getElementById("init");
-const infoMenu = document.getElementById("info-menu");
+const postInitMenu = document.getElementById("info-menu");
 let namelistPath = null;
 
 window.addEventListener("DOMContentLoaded", async () => {
-    fetch("/streamStatus")
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.stream_state === "running") {
-                // Hide form and show post-init menu 
-                form.style.display = "none";
-                infoMenu.style.display = "flex";
-                document.getElementById("stream-url").textContent = localStorage.getItem("streamSrc") || "N/A";
-                document.getElementById("namelist-path").textContent = localStorage.getItem("namelistPath") || "N/A";
-            } 
-            else {
-                // Hide post-init menu and show form
-                infoMenu.style.display = "none";
-                form.style.display = "flex"
-            }
-        })
-        .catch((error) => console.log(error));
+    // Show form and hide post-init menu
+    postInitMenu.style.display = "none";
+    form.style.display = "flex";
+
+    // Check if initialized
+    if (localStorage.getItem("initialized") === "true") {
+        // Hide form and show post-init menu 
+        form.style.display = "none";
+        postInitMenu.style.display = "flex";
+        document.getElementById("stream-url").textContent = localStorage.getItem("streamSrc") || "N/A";
+        document.getElementById("namelist-path").textContent = localStorage.getItem("namelistPath") || "N/A";
+    }
 });
 
 
@@ -50,51 +45,106 @@ document.getElementById("init").onsubmit = async (event) => {
 
     // Remove submit button and create loading indicator
     const submitButton = document.getElementById("submit-button");
-    submitButton.remove();
+    submitButton.style.display = "none";
 
-    const loader = document.createElement("h4");
-    loader.classList.add("loading-indicator");
-    let intervalId = createLoadingAnimation("Loading embeddings", loader);
-    
-    form.appendChild(loader);
+    const loading = Loading(form);
+    loading.start("Starting stream");
 
-    // Load embeddings then start stream
-    fetch(`/start`, {
-        method: "POST",
-        body: formData,
-    })
-        .then((response) => response.json())
-        .then((data) => {
-            // Replace loading animation with "Starting stream..."
-            clearInterval(intervalId);
-            intervalId = createLoadingAnimation("Starting stream", loader);
+    try {
+        // Start stream
+        let response = await fetch(`/api/start_stream`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({"stream_src": streamSrc}),
+        });
+        let data = await response.json();
+        loading.stop();
 
-            if (data.stream) {
-                console.log("Stream started!")
+        if (!data.stream) {
+            loading.remove();
+            submitButton.style.display = "block";
+            alert(data.message || "Failed to start stream");
+            return;
+        }
 
-                // Hide form, loader and show post-init menu 
-                clearInterval(intervalId);
-                loader.remove();
-                form.style.display = "none";
-                infoMenu.style.display = "flex";
-                document.getElementById("stream-url").textContent = localStorage.getItem("streamSrc") || "N/A";
-                document.getElementById("namelist-path").textContent = localStorage.getItem("namelistPath") || "N/A";
-            }
-            else {
-                alert(data.message);
-            }
-        })
+        // Start FR
+        loading.start("Loading embeddings");
+        response = await fetch("/api/start_fr", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({"data_file": namelistPath}),
+        });
+        data = await response.json();
+        loading.stop();
+        
+        if (!data.inference) {
+            loading.remove();
+            submitButton.style.display = "block";
+
+            alert(data.message || "Failed to start FR");
+            return;
+        }
+
+        // Success! 
+        // Hide form, loader and show post-init menu 
+        submitButton.style.display = "block";
+        form.style.display = "none";
+        postInitMenu.style.display = "flex";
+        document.getElementById("stream-url").textContent = localStorage.getItem("streamSrc") || "N/A";
+        document.getElementById("namelist-path").textContent = localStorage.getItem("namelistPath") || "N/A";
+
+        localStorage.setItem("initialized", true);
+
+    } catch (error) {
+        console.log(error)
+        loading.remove();
+        submitButton.style.display = "block"
+        localStorage.setItem("initialized", false);
+
+        alert(`Error loading stream from ${streamSrc}. Please reset and try again.`);
+    }
 };
 
-// Handles loading animation (for dots)
-const createLoadingAnimation = (text, loaderEl) => {
-    let dotCount = 0;
-    const updateLoadingText = () => {
-        dotCount = (dotCount % 3) + 1;
-        loaderEl.innerText = text + ".".repeat(dotCount);
+const Loading = (formEl) => {
+    let loader = formEl.querySelector(".loading-indicator");
+    if (!loader) {
+        loader = document.createElement("h4");
+        loader.classList.add("loading-indicator");
+        formEl.appendChild(loader);
+    }
+
+    let intervalId = null;
+
+    const stop = () => {
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
     };
 
-    return setInterval(updateLoadingText, 500);
+    const start = (text) => {
+        stop();
+
+        let dotCount = 0;
+        const updateLoadingText = () => {
+            dotCount = (dotCount % 3) + 1;
+            loader.innerText = text + ".".repeat(dotCount);
+        };
+
+        intervalId =  setInterval(updateLoadingText, 500);
+    }
+
+    const remove = () => {
+        stop();
+        loader?.remove();
+        loader = null;
+    };
+
+    return {
+        start,
+        stop,
+        remove,
+    };
 };
 
 // Handles stream selection
@@ -201,8 +251,9 @@ document
     .getElementById("reset-button")
     .addEventListener("click", async (event) => {
         event.preventDefault();
+        localStorage.setItem("initialized", false);
 
-        fetch("/end", {
+        fetch("/api/end", {
             method: "POST",
         })
             .then((response) => response.json())
@@ -245,7 +296,7 @@ const openVideoModalButton = document.getElementById("open-video-modal-button");
 if (openVideoModalButton) {
     openVideoModalButton.addEventListener("click", () => {
         const videoFeed = document.getElementById("video-feed");
-        videoFeed.setAttribute("data", `/vidFeed?t=${Date.now()}`);
+        videoFeed.setAttribute("data", `/api/vidFeed?t=${Date.now()}`);
 
         showVideoModal();
     });

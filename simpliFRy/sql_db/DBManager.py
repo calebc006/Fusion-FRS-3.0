@@ -4,7 +4,7 @@ from typing import Generator, TypedDict
 
 import numpy as np
 
-from fr.logger import log_info
+from lib.utils import log_info
 
 DB_FP = "Embeddings.db"
 

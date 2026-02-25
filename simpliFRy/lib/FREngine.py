@@ -9,6 +9,8 @@ from typing import Generator, TypedDict
 import subprocess
 from collections import deque
 import json
+import hashlib
+from tqdm import tqdm
 import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
@@ -16,9 +18,10 @@ import voyager
 
 from lib.VideoPlayer import VideoPlayer, StreamState
 from lib.utils import calc_iou, log_info
-
+from sql_db import get_db, recreate_table, fetch_records, save_record
 
 FR_SETTINGS_PATH = 'settings.json'
+EMBEDDINGS_CACHE_FP = 'embeddings_cache.json'
 FR_DEFAULT_SETTINGS = {
     "threshold": 0.45, 
     "holding_time": 2, 
@@ -52,7 +55,6 @@ class FRResult(TypedDict, total=False):
     norm_embed: np.ndarray
     score: float
     last_seen: float
-    is_target: bool
 
 
 class FRSettings(TypedDict):
@@ -183,11 +185,6 @@ class FREngine:
         self.inferenceThread = None
         self.fr_results = []
 
-        # Capture 
-        self.capture_lock = threading.Lock()
-        self.latest_target_frame: np.ndarray | None = None
-        self.latest_target_detection: dict | None = None
-        
         # Other state
         self.persisted_detections: deque[FRResult] = deque(maxlen=self.fr_settings["q_max_size"])
         self.embeddings_loaded = False
@@ -196,27 +193,33 @@ class FREngine:
         log_info(f"FR Model initialised! Input: {self.width}x{self.height}, {self.fps}fps; Inference: {inference_width}x{inference_height}")
 
     
-    # ───────────────────────────── Settings and Embeddings ─────────────────────────────────
+    # ───────────────────────────── Embeddings ─────────────────────────────────
 
-    def adjust_values(self, new_settings: FRSettings) -> FRSettings:
-        '''Adjust settings to new_settings'''
+    def load_embeddings(self, data_file: str | None) -> None:
+        '''
+        Loads embeddings from DB cache or regenerates from namelist JSON
 
-        previous_settings = self.fr_settings or self._load_settings()
-        self.fr_settings = {**previous_settings, **new_settings} # Merge new_settings with previous
-        with open(FR_SETTINGS_PATH, 'w') as f:
-            json.dump(self.fr_settings, f)
-        return self.fr_settings
-    
-    def load_embeddings(self) -> None:
-        '''Resets index, reloads from cache (recomputes cache if not found)'''
+        Arguments
+        - data_file: file path (relative to './data' folder) to json file linking names to pictures
+        '''
         self.embeddings_loading = True
         self.embeddings_loaded = False
+        data_file = data_file.strip()
 
         try:
             self.embedding_index.reset_index()
             self.persisted_detections.clear()
 
-            self._load_captures()
+            if not data_file or not self._should_regenerate_embeddings(data_file):
+                log_info("Loading embeddings from database...")
+                with get_db() as conn:
+                    records = fetch_records(conn)
+                for record in records:
+                    self.embedding_index.add_item(record["name"], record["ave_embedding"])
+                log_info(f"Loaded {self.embedding_index.size()} embeddings from db")
+            else:
+                log_info("Generating embeddings...")
+                self._generate_embeddings(data_file)
 
             self.embeddings_loading = False
             self.embeddings_loaded = True
@@ -226,6 +229,115 @@ class FREngine:
             self.embeddings_loaded = False
 
             log_info("Failed to load embeddings!")
+
+    def _generate_embeddings(self, data_file: str) -> None:
+        """Create embeddings from namelist JSON and save to SQLite database"""
+
+        if not data_file.endswith(".json"):
+            raise ValueError("Please provide a json file with the .json extension.")
+
+        if not os.path.exists(data_file):
+            raise FileNotFoundError(f"{data_file} does not exist!")
+
+        with open(data_file, "r") as file:
+            data_dict = json.load(file)
+
+        # Resolve img_folder_path relative to the data file's directory
+        data_dir = os.path.dirname(data_file)
+        img_folder_path = os.path.join(data_dir, data_dict["img_folder_path"])
+
+        with get_db() as conn:
+            recreate_table(conn)
+            log_info("Extracting embeddings from images...")
+            self.embedding_index.reset_index()
+
+            for entry in tqdm(data_dict["details"]):
+                name = entry["name"]
+                ave_embedding = self._avg_embedding(img_folder_path, entry["images"])
+
+                if ave_embedding.size == 0:
+                    continue
+
+                save_record(conn, name, ave_embedding)
+                self.embedding_index.add_item(name, ave_embedding)
+
+        # Save cache info after successful generation
+        file_hash = self._compute_file_hash(data_file)
+        self._save_cache_info(data_file, file_hash)
+
+    def _avg_embedding(self, folder_path: str, image_list: list[str]) -> np.ndarray:
+        """Extract the average embedding from images in image_list"""
+        embeddings = []
+        no_face = 0
+        for img_name in image_list:
+            try:
+                img_path = os.path.join(folder_path, img_name)
+                img = cv2.imread(img_path)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # Convert to RGB after using cv2.imread
+                faces = self.model.get(img)
+                if faces:
+                    embeddings.append(faces[0].normed_embedding)
+                else:
+                    no_face += 1
+            except Exception as e:
+                log_info(f"Error processing image: {img_name} ({e})")
+        if no_face and not embeddings:
+            log_info(f"No face detected in {no_face} image(s) from {folder_path}.")
+        return np.mean(embeddings, axis=0) if embeddings else np.array([])
+
+    @staticmethod
+    def _compute_file_hash(filepath: str) -> str:
+        """Compute SHA256 hash of a file"""
+        sha256_hash = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    @staticmethod
+    def _load_cache_info() -> dict:
+        """Load embedding cache information"""
+        if os.path.exists(EMBEDDINGS_CACHE_FP):
+            with open(EMBEDDINGS_CACHE_FP, 'r') as f:
+                return json.load(f)
+        return {}
+
+    @staticmethod
+    def _save_cache_info(data_file: str, file_hash: str) -> None:
+        """Save embedding cache information"""
+        cache_info = {
+            "data_file": data_file,
+            "file_hash": file_hash,
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(EMBEDDINGS_CACHE_FP, 'w') as f:
+            json.dump(cache_info, f, indent=2)
+
+    def _should_regenerate_embeddings(self, data_file: str) -> bool:
+        """Check if embeddings need to be regenerated based on file hash"""
+        current_hash = self._compute_file_hash(data_file)
+        cache_info = self._load_cache_info()
+
+        if cache_info.get("data_file") == data_file and cache_info.get("file_hash") == current_hash:
+            with get_db() as conn:
+                records = fetch_records(conn)
+                if len(records) > 0:
+                    log_info(f"Using cached embeddings (file hash matches: {current_hash[:8]}...)")
+                    return False
+        
+        log_info("Regenerating embeddings (file changed or no cache)")
+        return True
+
+    # ───────────────────────────── Settings ─────────────────────────────────
+
+    def adjust_values(self, new_settings: FRSettings) -> FRSettings:
+        '''Adjust settings to new_settings'''
+
+        previous_settings = self.fr_settings or self._load_settings()
+        self.fr_settings = {**previous_settings, **new_settings} # Merge new_settings with previous
+        with open(FR_SETTINGS_PATH, 'w') as f:
+            json.dump(self.fr_settings, f)
+        return self.fr_settings
 
     def _load_settings(self) -> FRSettings:
         ''''
@@ -275,7 +387,6 @@ class FREngine:
                     "bbox": r["bbox"],
                     "score": r["score"],
                     "last_seen": r["last_seen"],
-                    "is_target": r["is_target"],
                 }
                 for r in results
             ]
@@ -434,9 +545,6 @@ class FREngine:
 
             t2 = time.monotonic() # t2-t1 is the time to match labels
 
-            # Update target
-            target_idx = self._update_capture_target(frame, embeddings, labels, bboxes)
-            
             current_detections = [
                 FRResult({
                     "label": labels[i],
@@ -444,7 +552,6 @@ class FREngine:
                     "norm_embed": embeddings[i], 
                     "score": float(dists[i][0]),
                     "last_seen": time.monotonic(),
-                    "is_target": i == target_idx
                 })
                 for i in range(len(preds))
             ]
@@ -454,7 +561,7 @@ class FREngine:
                 if r["label"] != "Unknown":
                     self.persisted_detections.append(r)
 
-            t3 = time.monotonic() # t3-t2 is the time to do remaining tasks: persist, update target
+            t3 = time.monotonic() # t3-t2 is the time it takes to update persistor state
 
             return current_detections, t1-t0, t2-t1, t3-t2
 
@@ -511,246 +618,4 @@ class FREngine:
         return [bbox[0] / w, bbox[1] / h, bbox[2] / w, bbox[3] / h]
 
 
-    # ───────────────────────────── Capture ─────────────────────────────────
     
-    def capture_unknown(self, name: str, allow_duplicate: bool=False, target_image=None) -> dict:
-        '''
-        Captures the latest target, saves image and updates the vector index.
-        If name is in database and allow_duplicate=False, returns target crop for retry.
-        If target_image specified, uses that instead of latest target detection.
-        '''
-        name = (name or "").strip()
-        if not name or name == "":
-            return {"ok": False, "message": "Name is required."}
-        
-        # Process name: remove spaces, non-legal characters, convert to uppercase
-        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ").strip().replace(" ", "_").upper()
-        data_dir = os.path.join("data", "captures", safe_name)
-        current_names = os.listdir(os.path.join("data", "captures"))
-
-        # If target_image not provided, store snapshot of current target using latest_target_detection
-        crop = target_image
-
-        if crop is None:
-            with self.capture_lock:
-                detection, frame = self.latest_target_detection, self.latest_target_frame
-            if detection is None or frame is None:
-                return {"ok": False, "message": "No target face available."}
-            crop = self._crop_image(np.asarray(frame), detection["bbox"]) # convert back from memoryview to np array first!
-
-        # Check if name is already in database. Block if allow_duplicate=False
-        if safe_name in current_names:
-            if not allow_duplicate:
-                return {"ok": False, "message": f"{safe_name} is already in database!", "crop": crop}
-        else:
-            os.makedirs(data_dir, exist_ok=True)
-        
-        try:
-            # Save image
-            img_path = os.path.join(data_dir, f"{safe_name}_{datetime.now():%Y%m%d_%H%M%S}.jpg")
-            crop = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR) # convert to BGR before using cv2.imwrite
-            cv2.imwrite(img_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 100])
-
-            # Recompute cached embedding for that person
-            updated_emb = self._recompute_cached_embedding(data_dir)
-            
-            # Check if no face detected!
-            if updated_emb is None:
-                log_info(f"Capture failed for {safe_name}. No face detected!")
-                os.remove(img_path)
-                return {"ok": False, "message": "No face detected!"}
-            
-            # Update vector index
-            self.embedding_index.add_item(safe_name, updated_emb)
-
-            log_info(f"Captured face for {safe_name}")
-            return {"ok": True, "message": f"Captured {safe_name} successfully."}
-
-        except Exception as e:
-            log_info(f"Capture failed for {safe_name}: {e}")
-            return {"ok": False, "message": "Failed to save capture."}
-    
-    def remove_capture_image(self, image_path: str) -> dict:
-        '''Delete image then refresh cached + in-memory embedding'''
-
-        relative_path = image_path.lstrip("/\\")
-        captures_root = os.path.realpath(os.path.join(os.getcwd(), "data", "captures"))
-        target_path = os.path.realpath(os.path.join(captures_root, relative_path))
-        person_dir = os.path.dirname(target_path)
-        name = os.path.basename(person_dir).strip().upper()
-
-        if not (target_path == captures_root or target_path.startswith(captures_root + os.sep)):
-            return {"ok": False, "message": "Invalid image_path"}
-        if not os.path.isfile(target_path):
-            return {"ok": False, "message": "Image not found"}
-
-        # Delete image and recompute embedding for that person
-        os.remove(target_path)
-        emb = self._recompute_cached_embedding(person_dir)
-
-        # Check if there is no more embedding for the person 
-        if emb is None or not emb.size:
-            # Person should be completely removed
-            self.embedding_index.remove_item(name)
-        else:
-            # Image removed but others still exist; update embeddings
-            self.embedding_index.add_item(name, emb)
-
-        log_info(f"Removed image: {image_path}")
-        return {"ok": True, "message": "Success!"}
-
-    def _crop_image(self, frame: np.ndarray, bbox: list[float], margin: float=0.7):
-        '''Crops a frame based on the bbox, leaving a margin'''
-
-        l = max(int(bbox[0] * self.width), 0)
-        t = max(int(bbox[1] * self.height), 0)
-        r = min(int(bbox[2] * self.width), self.width)
-        b = min(int(bbox[3] * self.height), self.height)
-
-        # Expand bbox by margin while staying within frame
-        bw, bh = max(r - l, 0), max(b - t, 0)
-        pad_x = int(bw * margin)
-        pad_y = int(bh * margin)
-        l = max(l - pad_x, 0)
-        r = min(r + pad_x, self.width)
-        t = max(t - pad_y, 0)
-        b = min(b + pad_y, self.height)
-
-        crop = frame[t:b, l:r]
-
-        return crop
-
-    def _update_capture_target(self, frame: np.ndarray, embeddings: list, labels: list[str], bboxes: list) -> int | None:
-        '''
-        Chooses the unknown detection with greatest area as target. 
-        Updates latest_target_frame and latest_target_detection for use by capture_unknown
-        Returns target_idx (or None if no unknown detections are found)
-        '''
-        target_idx = None
-        max_area = -1
-        for i, label in enumerate(labels):
-            if label != "Unknown" or i >= len(bboxes):
-                continue
-            box = bboxes[i]
-            area = max(0, (box[2] - box[0]) * (box[3] - box[1]))
-            if area > max_area:
-                max_area, target_idx = area, i
-
-        if target_idx is not None and target_idx < len(embeddings):
-            with self.capture_lock:
-                self.latest_target_frame = memoryview(frame)
-                self.latest_target_detection = {
-                    "bbox": bboxes[target_idx], 
-                    "embedding": np.asarray(embeddings[target_idx], dtype=np.float32)
-                }
-
-        return target_idx
-    
-    def _load_captures(self) -> int:
-        '''Reload all images from cache, update index (recompute cache file if not found)'''
-
-        root = os.path.join("data", "captures")
-        if not os.path.isdir(root):
-            return 0
-
-        added = 0
-        scanned = 0
-
-        for name in sorted(os.listdir(root)):
-            person_dir = os.path.join(root, name)
-            if not os.path.isdir(person_dir):
-                continue
-
-            images = self._list_capture_images(person_dir)
-            scanned += len(images)
-
-            if not images:
-                _ = self._recompute_cached_embedding(person_dir) # run this to delete the folder
-                continue
-
-            # Prefer cached average; recompute if missing
-            emb = self._load_cached_embedding(person_dir)
-            if emb is None:
-                emb = self._recompute_cached_embedding(person_dir)
-
-            if emb is not None and emb.size:
-                self.embedding_index.add_item(name, emb)
-                added += 1
-
-        log_info(f"Loaded {added} capture embeddings from {scanned} images.")
-        return added
-
-    def _get_avg_embedding(self, folder: str) -> np.ndarray:
-        embeddings = []
-        images = self._list_capture_images(folder)
-
-        for img_name in images:
-            try:
-                img_path = os.path.join(folder, img_name)
-
-                img = cv2.imread(img_path)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # Convert to RGB after using cv2.imread
-                faces = self.model.get(img)
-
-                if faces:
-                    embeddings.append(faces[0].normed_embedding)
-                else:
-                    log_info(f"No face detected from {img_name}.")
-
-            except Exception as e:
-                log_info(f"Capture image load failed: {img_name} ({e})")
-        
-        return np.mean(embeddings, axis=0) if embeddings else np.array([])
-
-    def _load_cached_embedding(self, folder: str) -> np.ndarray | None:
-        cache_path = self._embedding_cache_path(folder)
-        if not os.path.exists(cache_path):
-            return None
-        try:
-            return np.load(cache_path)
-        except Exception as e:
-            log_info(f"Embedding cache load failed: {cache_path} ({e})")
-            return None
-
-    def _recompute_cached_embedding(self, folder: str) -> np.ndarray | None:
-        '''
-        Recalculates average embedding from images in folder and updates cache. 
-        Returns the embedding if no issues arise, else returns None
-        '''
-        # Remove cache file and folder if no images
-        images = self._list_capture_images(folder)
-        if not images:
-            cache_path = self._embedding_cache_path(folder)
-            if os.path.exists(cache_path):
-                os.remove(cache_path)
-            os.rmdir(folder)
-            return None
-
-        emb = self._get_avg_embedding(folder)
-        if emb.size:
-            try:
-                np.save(self._embedding_cache_path(folder), emb)
-            except Exception as e:
-                log_info(f"Embedding cache save failed: {folder} ({e})")
-            return emb
-
-        log_info(f"Embedding cache save failed: no embeddings found in {folder}!")
-        return None
-
-    @staticmethod
-    def _embedding_cache_path(folder: str) -> str:
-        return os.path.join(folder, "embedding_avg.npy")
-
-    @staticmethod
-    def _count_capture_images(folder: str) -> int:
-        try:
-            return len([i for i in os.listdir(folder) if i.lower().endswith((".jpg", ".jpeg", ".png"))])
-        except Exception:
-            return 0
-
-    @staticmethod
-    def _list_capture_images(folder: str) -> list[str]:
-        return [
-            i for i in os.listdir(folder)
-            if i.lower().endswith((".jpg", ".jpeg", ".png"))
-        ]

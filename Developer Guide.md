@@ -1,4 +1,4 @@
-# Developer's Guide for SimpliFRy
+# Developer's Guide 
 
 Technical documentation for SimpliFRy's facial recognition pipeline, tuning parameters, and API integration.
 
@@ -77,8 +77,6 @@ Tunable parameters via `/submit_settings` endpoint. Settings are saved to `setti
 | **Max Detections** | `max_detections` | 50 | [5, 100], step 1 | Maximum number of detections processed by backend |
 | **Perf Logging** | `perf_logging` | false | bool | If enabled, periodically logs inference FPS, avg inference time, and search timings to `data/logs/` |
 | **Frame Skip** | `frame_skip` | 1 | [1, 10], step 1 | Process every Nth frame (1=no skip, 2=every other frame). Higher values reduce CPU/GPU load |
-| **Video Width** | `video_width` | 1920 | [1, 4000], step 1 | Width of video streamed to frontend |
-| **Video Height** | `video_height` | 1080 | [1, 4000], step 1 | Height of video streamed to frontend |
 
 ### Differentiator Parameters
 

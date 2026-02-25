@@ -40,6 +40,7 @@ reset_button?.addEventListener("click", async (event) => {
 
     localStorage.removeItem("namelistPath");
     localStorage.removeItem("streamSrc");
+    localStorage.setItem("initialized", false)
     window.location.href = "/";
 });
 

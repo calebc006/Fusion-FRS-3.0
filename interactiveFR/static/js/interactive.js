@@ -5,6 +5,7 @@ import { initReferencesUI, refreshReferenceImages } from "./references.js";
 let hasTarget = false;
 
 const $ = (id) => document.getElementById(id);
+const capturePanel = $("capture-panel");
 const captureTarget = $("capture-target");
 const captureHeader = document.querySelector(".capture-header");
 const captureInput = $("capture-name");
@@ -60,6 +61,7 @@ window.addEventListener("DOMContentLoaded", async () => {
                     restart.message ||
                         "Stream not started. Please start from Home.",
                 );
+                localStorage.setItem("initialized", false);        
                 return (window.location.href = "/");
             }
         }
@@ -83,6 +85,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         initReferencesUI({ autoLoad: true });
     } catch {
         alert("Unable to connect to server.");
+        localStorage.setItem("initialized", false);    
         window.location.href = "/";
     }
 });
@@ -157,6 +160,7 @@ function updateCapturePanel(data) {
     captureTarget.textContent = hasTarget ? "Ready" : "None";
     captureBtn.disabled = !hasTarget;
     captureHeader?.classList.toggle("is-ready", hasTarget);
+    capturePanel?.classList.toggle("is-ready", hasTarget);
 }
 
 async function updatePerfDisplay() {

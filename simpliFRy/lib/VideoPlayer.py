@@ -7,7 +7,11 @@ from typing import Generator
 import numpy as np
 import cv2
 
+<<<<<<< HEAD:simpliFRy/fr/VideoPlayer.py
+from fr.logger import log_info
+=======
 from lib.utils import log_info
+>>>>>>> 54f377b3433543dbebb7393a65af4297178e0a2a:simpliFRy/lib/VideoPlayer.py
 
 class RWLock:
     """

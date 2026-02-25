@@ -1,9 +1,8 @@
 import {
-    setBBoxPos,
-    clearBBoxes,
     loadNamelistJSON,
     getTable,
     sortDetectionsByPriority,
+    fetchSettings
 } from "./utils.js";
 
 let namelistJSON = null;
@@ -483,7 +482,7 @@ document.addEventListener("click", (e) => {
     }
 });
 
-// ------------ LIGHTING FUNCTIONALITY --------------
+// ------------ MAIN LOOP --------------
 
 // MAIN LOOP
 const fetchDetections = () => {
@@ -491,7 +490,7 @@ const fetchDetections = () => {
     let buffer = "";
     let data = [];
 
-    fetch(`/frResults`)
+    fetch(`/api/frResults`)
         .then((response) => {
             if (!response.ok || !response.body) {
                 console.error("Fetch failed, retrying...");
@@ -529,7 +528,7 @@ const fetchDetections = () => {
 
                     if (Array.isArray(data)) {
                         updateTables(data);
-                        updateTableDetections(data);
+                        updateDetectionList(data);
                         if (document.URL.includes("old_layout")) {
                             // hacky and not good practice. will refactor in the future.
                             updateBBoxes(data);
@@ -602,31 +601,48 @@ const updateTables = (data) => {
 
 // table detection list functionality
 
+let HOLD_TIME = 100;
+fetchSettings().then(settings => {
+    HOLD_TIME = settings.holding_time * 1000; 
+});
+const activeDetections = new Map(); // name -> { lastSeen, detection }
 const detectionList = document.getElementById("table-detection-list");
 
-const updateTableDetections = (data) => {
-    let detections = [];
+const updateDetectionList = (data) => {
+    const now = Date.now();
 
+    // Update / refresh detections from stream
     data.forEach((detection) => {
         const name = detection.label.toUpperCase();
-        if (name == "UNKNOWN") {
-            return;
+        if (name === "UNKNOWN") return;
+
+        activeDetections.set(name, {
+            lastSeen: now,
+            detection
+        });
+    });
+
+    // Remove expired detections
+    for (const [name, entry] of activeDetections.entries()) {
+        if (now - entry.lastSeen > HOLD_TIME) {
+            activeDetections.delete(name);
         }
-        
+    }
+
+    // Render from activeDetections
+    let detections = [];
+
+    for (const [name, entry] of activeDetections.entries()) {
         let table = getTable(name, namelistJSON);
-        if (table == null) {
-            table = "";
-        } else {
-            table = "(" + table + ")"; 
-        }
+        table = table ? `(${table})` : "";
 
         let detectionEl = document.createElement("div");
         detectionEl.classList.add("table-detection-element");
-        detectionEl.dataset.name = name; // For priority sorting
+        detectionEl.dataset.name = name;
         detectionEl.innerHTML = `${name} ${table}`;
 
         detections.push(detectionEl);
-    });
+    }
 
     detections = sortDetectionsByPriority(detections, namelistJSON);
     detectionList.replaceChildren(...detections);

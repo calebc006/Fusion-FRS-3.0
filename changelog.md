@@ -21,16 +21,21 @@
 - [ ] Update docs and developer guide
 
 ### SimpliFRy
-- [ ] Reuse similar backend to InteractiveFR
-- [ ] Port over QOL UI changes (perf-logging, settings), refactor UI
+- [x] Reuse similar backend to InteractiveFR
+- [x] Port over UI changes, rework init page logic, implement holding_time
+- [ ] Port over perf log
 - [ ] Reliability and performance testing
 - [ ] Update docs
 
 ### Gotendance
+- [x] Confirm that we aren't dropping any detections, even with high update interval
 - [ ] Auto import namelist file, use full path
 - [ ] Manual marking overrules automatic detection
 - [ ] Update docs
 
 ## Future
-- [ ] Lazy loading for reference images
+- [ ] Convert all thresholds to cosine *similarity* (higher = better match)
 - [ ] Implement TLS (https) for safer multi-location implementation
+- [ ] Two separate FFMPEG processes for RAW and MJPEG streams
+- [ ] Lazy loading for reference images
+- [ ] ibpng warning: iCCP: known incorrect sRGB profile (warning during png decode)
