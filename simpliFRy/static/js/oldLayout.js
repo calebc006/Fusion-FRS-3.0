@@ -7,7 +7,7 @@ import {
     fetchSettings 
 } from "./utils.js";
 
-const detectionList = document.getElementById("table-detection-list");
+const detectionList = document.getElementById("detection-list");
 let namelistJSON = undefined;
 
 let HOLD_TIME = 100;
@@ -115,7 +115,7 @@ const updateDetectionList = (data) => {
         let description = getDescription(name, namelistJSON);
 
         let detectionEl = document.createElement("div");
-        detectionEl.classList.add("table-detection-element");
+        detectionEl.classList.add("detection-element");
         detectionEl.dataset.name = name;
 
         detectionEl.innerHTML = `

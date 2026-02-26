@@ -1,3 +1,7 @@
+body {
+    background-color: var(--color-foreground);
+}
+
 #main-container {
     display: flex;
     justify-content: space-between;
@@ -6,7 +10,7 @@
     width: 100vw;
     position: fixed;
     left: 0;
-    bottom: 0;
+    top: 23vh;
     margin: 0;
 }
 
@@ -18,7 +22,6 @@
     padding: 2em;
     box-sizing: border-box;
     position: relative;
-
     transform: translateY(-7vh);
 }
 
@@ -132,17 +135,15 @@
 .detection-list-container {
     display: flex;
     width: 66.67%;
-    height: 75vh;
+    height: 65vh;
     font-family: "Times New Roman", Times, serif;
     font-size: 24px;
     box-sizing: border-box;
-    padding: 2em;
     overflow-y: auto;
+    border-left: solid 3px #242424;
 }
 
 .detections {
-    margin-top: 4.3em;
-    padding-right: 0.7em;
     font-size: 36px;
     width: 100%;
 }

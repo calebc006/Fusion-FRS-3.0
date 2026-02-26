@@ -1,3 +1,7 @@
+body { 
+    background-color: var(--color-foreground);
+}
+
 .seatings {
     display: grid;
     grid-template-columns: repeat(3, 160px);
@@ -176,7 +180,7 @@
 .table-detection-list {
     position: absolute;
     top: 25vh;
-    left: 60vw;
+    left: 62vw;
     width: 30vw;
     padding-left: 10px;
     padding-right: 10px;
@@ -187,4 +191,5 @@
     font-family: Helvetica, sans-serif;
     color: black;
     margin-bottom: 10px;
+    text-align: center;
 }

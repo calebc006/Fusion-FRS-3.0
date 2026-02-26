@@ -5,8 +5,8 @@
 
 @media (prefers-color-scheme: light) {
     :root {
-        --color-background: #fff;
-        --color-foreground: #000;
+        --color-foreground: #242424;
+        --color-background: #dddddd;
     }
 }
 
@@ -36,11 +36,13 @@ body {
 }
 
 .title {
-    /* margin-top: 0.75em; */
     text-align: center;
-    margin-right: 20px;
-    font-family: "Times New Roman", Times, serif;
-    font-size: 40px;
+    font-size: 5em;
+    font-weight: bold;
+    position: absolute;
+    top: 8vh;
+    margin-left: auto;
+    color: #242424;
 }
 
 .hidden-object {

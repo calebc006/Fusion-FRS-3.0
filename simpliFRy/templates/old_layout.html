@@ -9,7 +9,9 @@
     <link rel="stylesheet" href="../static/css/taskbar.css" />
     <link rel="stylesheet" href="../static/css/old-layout.css" />
   </head>
-  <body class="bg-image" style="background-image: url('../static/images/old_bg.png')">
+  <body>
+    <div class="title">FUSION FACIAL RECOGNITION SYSTEM</div>
+
     <!-- Seatings Menu -->
     <div id="table-menu" style="display: none">
       <div class="menu-header" id="table-menu-header">
@@ -26,16 +28,20 @@
         </div>
       </div>
     </div>
-
-    <!-- Video feed goes here -->
-    <div id="video-container">
-      <object id="video-feed" type="image/jpeg">
-        <img src="../static/images/default.jpg" alt="default video image" />
-      </object>
+    
+    <div class="container">
+      <!-- Video feed goes here -->
+      <div id="video-container">
+        <object id="video-feed" type="image/jpeg">
+          <img src="../static/images/default.jpg" alt="default video image" />
+        </object>
+      </div>
+  
+      <!-- Detection list goes here -->
+      <div class="detection-container">
+        <div class="detection-list" id="detection-list"></div>
+      </div>
     </div>
-
-    <!-- Detection list goes here -->
-    <div class="table-detection-list" id="table-detection-list"></div>
 
     <!-- Logos -->
     <div class="flex-container-logo">
