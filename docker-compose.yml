@@ -1,3 +1,4 @@
+name: frs-v3.2-wps
 services:
   simplifry:
     image: simplifry:v3.2
