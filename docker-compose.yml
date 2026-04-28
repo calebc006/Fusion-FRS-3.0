@@ -1,3 +1,4 @@
+name: frs-v3.2-master
 services:
   simplifry:
     image: simplifry:v3.2-stef
