@@ -246,7 +246,7 @@ We acknowledge the past versions of FRS, built by our seniors in Fusion Coy; muc
 - v1.0: https://github.com/CJBuzz/FRS
 
 Special thanks to:
-- [**Cooleststar**](https://github.com/cooleststar): The long-time maintainer of FRS v2.0-v2.2. Without his efforts this project could not have survived for my generation to see.
+- [**Cooleststar**](https://github.com/cooleststar): The long-time maintainer of FRS v2.0-v2.2 and one of the main developers that supported the FRS v3.0. Without his efforts this project could not have survived for my generation to see. He was also the one who developed the Showcase version of the FRS.
 - [**Ruihongc**](https://github.com/ruihongc): Suggesting the use of Spotify's Voyager which led to much faster embedding search compared to previous methods.
 - [**BabyWaffles**](https://github.com/BabyWaffles): Dockerization of simpliFRy was made possible by his extensive help.
 - [**CJBuzz**](https://github.com/CJBuzz): One of the first few developers of this project.
