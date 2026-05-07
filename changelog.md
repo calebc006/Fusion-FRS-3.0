@@ -2,7 +2,7 @@
 
 ## div-wps-may26 branch: 
 - No custom background, use old_layout
-- "ORANGE", "GREEN", "PINK" tables change color of displayed name in oldLayout.js detection list 
+- "ORANGE", "YELLOW", "RED" tables change color of displayed name in oldLayout.js detection list 
 
 ## v3.2 (In testing, as of 270426)
 - UI updates, improved documentation

@@ -126,11 +126,11 @@ const updateDetectionList = (data) => {
         if (table == "ORANGE") {
             detectionEl.style.color = "orange";
         }
-        if (table == "GREEN") {
-            detectionEl.style.color = "green";
+        if (table == "YELLOW") {
+            detectionEl.style.color = "#fbff00";
         }
-        if (table == "PINK") {
-            detectionEl.style.color = "#E25098";
+        if (table == "RED") {
+            detectionEl.style.color = "#f35151";
         }
 
         detections.push(detectionEl);
