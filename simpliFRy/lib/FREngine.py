@@ -283,7 +283,7 @@ class FREngine:
             except Exception as e:
                 log_info(f"Error processing image: {img_name} ({e})")
         if no_face and not embeddings:
-            log_info(f"No face detected in {no_face} image(s) from {folder_path}.")
+            log_info(f"No face detected in {no_face} image(s) from {image_list}.")
         return np.mean(embeddings, axis=0) if embeddings else np.array([])
 
     @staticmethod
