@@ -124,10 +124,10 @@ const updateDetectionList = (data) => {
 
         // FOR MAY 2026 6 DIV WPS
         if (table == "ORANGE") {
-            detectionEl.style.color = "orange";
+            detectionEl.style.color = "#ff9100";
         }
         if (table == "YELLOW") {
-            detectionEl.style.color = "#fbff00";
+            detectionEl.style.color = "#ffee00";
         }
         if (table == "RED") {
             detectionEl.style.color = "#f35151";
