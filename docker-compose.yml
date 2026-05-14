@@ -1,4 +1,4 @@
-name: frs-v3.2-stef
+name: frs-v3-2-stef
 services:
   simplifry:
     image: simplifry:v3.2-stef
