@@ -49,11 +49,33 @@ body {
 }
 
 .detection-element .detection-name {
-    font-size: 45px;
+    font-size: 50px;
     font-weight: bold;
 }
 
 .detection-element .detection-desc {
-    font-size: 30px;
+    font-size: 35px;
     opacity: 70%;
+}
+
+.title{
+    text-align: center;
+    margin-top: -10px;
+    color: black;
+    font-family: Arial, sans-serif;
+}
+
+.title .top{
+    font-size: 40px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    opacity: 1;
+    margin-bottom: 8px;
+}
+
+.title .bottom{
+    font-size: 60px;
+    font-weight: 1000;
+    text-transform: uppercase;
+    line-height: 1;
 }
