@@ -20,6 +20,7 @@ type Record struct {
 	LastSeen    time.Time `json:"lastSeen"`
 	ReferenceID string    `json:"referenceid"`
 	Tags        []string  `json:"tags"`
+	Table       string    `json:"table"`
 	Order       int       `json:"order"`
 }
 
@@ -32,6 +33,7 @@ type Person struct {
 	Name   string   `json:"name"`
 	Images []string `json:"images"`
 	Tags   []string `json:"tags"`
+	Table  string   `json:"table"`
 }
 
 type JsonStruct struct {
@@ -179,7 +181,7 @@ func (store *Store) CsvOut() ([]byte, error) {
 	w := csv.NewWriter(&b)
 
 	// Write header
-	header := []string{"Name", "Attendance", "Detected", "FirstSeen", "LastSeen", "ReferenceID", "Tags"}
+	header := []string{"Name", "Attendance", "Detected", "FirstSeen", "LastSeen", "ReferenceID", "Table", "Tags"}
 	if err := w.Write(header); err != nil {
 		return nil, err
 	}
@@ -193,6 +195,7 @@ func (store *Store) CsvOut() ([]byte, error) {
 			record.FirstSeen.Local().Format(time.RFC3339),
 			record.LastSeen.Local().Format(time.RFC3339),
 			record.ReferenceID,
+			record.Table,
 			strings.Join(record.Tags, ";"),
 		}
 		if err := w.Write(row); err != nil {
@@ -242,6 +245,7 @@ func (store *Store) LoadJSON(bytes []byte) error {
 		record := Record{
 			Name:  person.Name,
 			Tags:  person.Tags,
+			Table: person.Table,
 			Order: index,
 		}
 
@@ -252,6 +256,7 @@ func (store *Store) LoadJSON(bytes []byte) error {
 			record.FirstSeen = oldRecord.FirstSeen
 			record.LastSeen = oldRecord.LastSeen
 			record.Order = oldRecord.Order
+			record.Table = oldRecord.Table
 		} else {
 			record.Attendance = false
 			record.Detected = false
