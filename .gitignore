@@ -12,3 +12,4 @@ embeddings_cache.json
 __pycache__/
 
 settings.json
+output.json
