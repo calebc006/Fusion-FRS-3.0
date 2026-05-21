@@ -88,7 +88,7 @@ func startCollateHandler(store *collator.Store, streamsList *collator.StreamsLis
 
 		stopChan := streamsList.AddStreamSrc(url, updateInterval)
 		if stopChan != nil {
-			go collator.Stream(store, stopChan, url, updateInterval, recordFilename)
+			go collator.Stream(store, streamsList, stopChan, url, updateInterval, recordFilename)
 		}
 
 		response := generateOKRes()
@@ -240,14 +240,23 @@ func getStreamsListHandler(streamsList *collator.StreamsList) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		streamsListCopy := streamsList.FetchList()
 		
-		// Create a simple response struct without channels
+		// Create a response struct with health information
 		type StreamInfo struct {
-			Url string `json:"url"`
+			Url         string `json:"url"`
+			IsHealthy   bool   `json:"isHealthy"`
+			LastError   string `json:"lastError,omitempty"`
+			FailureCount int   `json:"failureCount"`
 		}
 		
 		streamInfos := make([]StreamInfo, len(streamsListCopy))
 		for i, stream := range streamsListCopy {
-			streamInfos[i] = StreamInfo{Url: stream.Url}
+			healthy, lastError, failureCount := stream.Health.GetStatus()
+			streamInfos[i] = StreamInfo{
+				Url:         stream.Url,
+				IsHealthy:   healthy,
+				LastError:   lastError,
+				FailureCount: failureCount,
+			}
 		}
 		
 		if err := json.NewEncoder(w).Encode(streamInfos); err != nil {

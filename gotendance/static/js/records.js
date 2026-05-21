@@ -9,6 +9,7 @@ class Records {
         this.allTags = new Set();
         this.selectedTags = new Set();
         this.currentFilterStatus = 'all';
+        this.searchQuery = ''; // Store current search query
     }
     
     createRecordsEl() {
@@ -148,10 +149,8 @@ class Records {
     }
 
     searchFilter(query) {
-        for (const entryEl of this.parentEl.children) {
-            const name = entryEl.children[0].textContent.toLowerCase()
-            entryEl.style.display = name.includes(query) ? "" : "none"
-        }
+        this.searchQuery = query.toLowerCase(); // Store the search query
+        this.applyAllFilters(); // Apply all filters together
     }
 
     filterRecords(status) {
@@ -193,8 +192,15 @@ class Records {
                     showByTag = details.tags && details.tags.some(tag => this.selectedTags.has(tag));
                 }
 
-                // Show only if both filters pass
-                const isVisible = showByStatus && showByTag;
+                // Apply search filter
+                const displayName = details.name || name;
+                let showBySearch = true;
+                if (this.searchQuery !== '') {
+                    showBySearch = displayName.toLowerCase().includes(this.searchQuery) || name.toLowerCase().includes(this.searchQuery);
+                }
+
+                // Show only if all filters pass
+                const isVisible = showByStatus && showByTag && showBySearch;
                 entryEl.style.display = isVisible ? '' : 'none';
                 
                 // Count based on tag filter only (ignore status filter for count)
@@ -247,17 +253,7 @@ const searchBarEl = document.getElementById('search')
 const search = () => {
     query = searchBarEl.value.toLowerCase()
     console.log(query)
-    if(query!=""){
-        records.searchFilter(query)
-    }
-    else{
-        console.log("show stuff")
-        for (const entryEl of records.parentEl.children) {
-            entryEl.style.display = ""
-            console.log(entryEl)
-            console.log(entryEl.style.display)
-        }
-    }
+    records.searchFilter(query) // Always call searchFilter to ensure filters are applied
 }
 
 searchBarEl.addEventListener("input", search)

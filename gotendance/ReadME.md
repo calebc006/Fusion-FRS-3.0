@@ -119,7 +119,7 @@ All endpoints return `{"status": "ok"}` on success. Stream data is auto-loaded f
 |----------|--------|---------|
 | `/startCollate` | POST | Start listening to a result stream |
 | `/stopCollate` | POST | Stop listening to a stream |
-| `/getStreamsList` | GET | List active streams |
+| `/getStreamsList` | GET | List active streams with health status |
 
 ### Static Files
 
@@ -198,12 +198,67 @@ Use the same JSON format as SimpliFRy:
 - Stop listening to a stream
 - Query: `frUrl` (exact stream URL)
 
+**GET `/getStreamsList`**
+- List all active streams with health status
+- Response: Array of stream objects with health info
+- Response Example:
+```json
+[
+  {
+    "url": "http://simplifry:1333/api/frResults",
+    "isHealthy": true,
+    "lastError": "",
+    "failureCount": 0
+  },
+  {
+    "url": "http://192.168.1.100:1333/api/frResults",
+    "isHealthy": false,
+    "lastError": "stream ended or error occurred: EOF",
+    "failureCount": 2
+  }
+]
+```
+- **isHealthy**: Current connection status (true = actively streaming)
+- **lastError**: Description of last error (empty if healthy)
+- **failureCount**: Number of consecutive connection failures
+
 **POST `/resetAttendance`**
 - Clear all attendance records
 - Response: `{"status": "ok"}`
 
 **GET `/records`**
 - Renders attendance records page in browser
+
+---
+
+## Stream Resilience & Recovery
+
+Gotendance includes automatic recovery for network failures:
+
+**Connection Handling:**
+- Each stream independently monitors its connection status
+- Failed streams do **not** affect other active streams
+- Automatic reconnection with exponential backoff (1s, 2s, 4s, 8s...)
+- After 5 consecutive failures, a stream is permanently stopped
+
+**Monitoring Stream Health:**
+- Call `/getStreamsList` to check all streams' health status
+- `isHealthy: true` = stream is actively receiving data
+- `isHealthy: false` = stream is disconnected or retrying
+- `failureCount` = consecutive failures since last successful connection
+
+Example cmd command to check this continually:
+```
+for /l %i in () do @(curl http://localhost:1500/getStreamsList & timeout /t 1 >nul)
+```
+
+**Example: Handling Network Recovery**
+1. SimpliFRy server goes offline
+2. Stream marked as `isHealthy: false` with error description
+3. Gotendance automatically retries with delays
+4. SimpliFRy comes back online
+5. Stream reconnects and resumes data collection
+6. Other streams continue operating normally
 
 ---
 
