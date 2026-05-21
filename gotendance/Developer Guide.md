@@ -9,6 +9,7 @@
 - [Architecture Overview](#architecture-overview)
 - [Result Stream](#result-stream)
 - [API Reference](#api-reference)
+- [Stream Resilience & Recovery](#stream-resilience--recovery)
 
 ---
 
@@ -18,9 +19,17 @@ Gotendance uses a concurrent architecture for real-time stream processing:
 
 - **Store**: Thread-safe in-memory data store for attendance records with mutex locks
 - **Stream Manager**: Manages multiple concurrent result streams, each in its own goroutine
+- **Stream Health Monitor**: Tracks connection status and implements automatic recovery for each stream
 - **HTTP Server**: Lightweight web server on port 1500 with RESTful API endpoints
 
 Data persists to `output.json` and is automatically loaded on startup.
+
+### Key Design Principles
+
+- **Stream Independence**: Each stream operates independently with its own health tracking and retry logic
+- **Resilience**: Failed streams automatically attempt reconnection without affecting other streams
+- **Visibility**: Real-time health status available through `/getStreamsList` endpoint
+- **Thread Safety**: All shared data protected with mutex locks for concurrent access
 
 ---
 
@@ -239,15 +248,31 @@ All endpoints return JSON responses. Successful operations return `{"status": "o
 ### 6. List Active Streams
 
 - **Endpoint**: `GET /getStreamsList`
-- **Description**: Get list of all currently monitored result streams
+- **Description**: Get list of all currently monitored result streams with health status
 - **Request**: No parameters required
 - **Response**:
   ```json
   [
-    {"url": "http://192.168.1.100:5000/frResults"},
-    {"url": "http://192.168.1.101:5000/frResults"}
+    {
+      "url": "http://192.168.1.100:5000/frResults",
+      "isHealthy": true,
+      "lastError": "",
+      "failureCount": 0
+    },
+    {
+      "url": "http://192.168.1.101:5000/frResults",
+      "isHealthy": false,
+      "lastError": "stream ended or error occurred: EOF",
+      "failureCount": 2
+    }
   ]
   ```
+- **Response Fields:**
+  - `url` (string): The stream URL being monitored
+  - `isHealthy` (boolean): Current connection status (true = actively streaming data)
+  - `lastError` (string): Description of the last error (empty if healthy)
+  - `failureCount` (integer): Number of consecutive connection failures
+- **Notes**: Each stream maintains independent health status and automatic recovery
 
 ---
 
@@ -266,4 +291,64 @@ All endpoints return JSON responses. Successful operations return `{"status": "o
 - **Description**: Reset all attendance records to absent and clear all detection data
 - **Request**: No parameters required
 - **Response**: `{"status": "ok"}`
-- **Notes**: Does not affect active stream connec
+- **Notes**: Does not affect active stream connections
+
+---
+
+## Stream Resilience & Recovery
+
+Gotendance implements robust stream recovery to ensure individual stream failures don't impact other active streams:
+
+### Connection Management
+
+Each stream operates independently with:
+- **Automatic reconnection**: Failed connections retry with exponential backoff (1s, 2s, 4s, 8s, 16s)
+- **Retry limit**: Maximum 5 consecutive failures before permanent stream termination
+- **Health tracking**: Real-time status available via `/getStreamsList` endpoint
+- **Isolation**: One stream's failure does not affect other streams
+
+### Monitoring Stream Health
+
+Use the `/getStreamsList` endpoint to check health status:
+
+```bash
+curl http://localhost:1500/getStreamsList
+```
+
+Response includes:
+- `isHealthy`: `true` if actively streaming, `false` if failed or retrying
+- `lastError`: Description of connection issue (empty when healthy)
+- `failureCount`: Number of consecutive failures since last recovery
+
+### Recovery Scenarios
+
+**Scenario 1: Temporary Network Interruption**
+1. Stream connection drops (network latency/packet loss)
+2. `isHealthy` set to `false` with error message
+3. Gotendance automatically retries with backoff
+4. Network restored
+5. Stream reconnects and resumes data collection
+6. `isHealthy` set back to `true`, `failureCount` reset
+
+**Scenario 2: Source Service Restart**
+1. Recognition service (SimpliFRy) goes offline
+2. Stream times out and marks as unhealthy
+3. Gotendance continues retrying
+4. Recognition service restarts
+5. Stream successfully reconnects
+6. Attendance tracking resumes immediately
+
+**Scenario 3: Persistent Failure**
+1. Stream fails 5 consecutive times
+2. Error persists despite retries
+3. Stream is permanently stopped
+4. Other streams continue operating
+5. Manual stream restart via `/stopCollate` then `/startCollate` if needed
+
+### Best Practices
+
+1. **Monitor `/getStreamsList` periodically** from your client to detect unhealthy streams
+2. **Log stream health changes** for debugging network issues
+3. **Do not restart all streams** if one fails—Gotendance recovers automatically
+4. **Use different recognition sources** for critical deployments (redundancy)
+5. **Check `failureCount`** to distinguish temporary issues from persistent problems

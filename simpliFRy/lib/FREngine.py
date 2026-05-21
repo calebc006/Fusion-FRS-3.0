@@ -25,7 +25,7 @@ EMBEDDINGS_CACHE_FP = 'embeddings_cache.json'
 FR_DEFAULT_SETTINGS = {
     "threshold": 0.5, 
     "holding_time": 2, 
-    "max_detections": 50, 
+    "max_detections": 200, 
     "perf_logging": True, 
     "frame_skip": 1, 
     "max_broadcast_fps": 50,
