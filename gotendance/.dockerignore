@@ -34,6 +34,5 @@ ReadME.md
 Developer Guide.md
 assets/
 
-settings.json
-embeddings_cache.json
-Embeddings.db
+output.json
+gotendance.exe
